@@ -77,6 +77,7 @@ class TestConfigBig(TestConfig):
         :param list expected_result: The result to match
         """
         # With memory backend
+        print("\n***")
         print("Query:")
         print(query)
         response, _ = self.livestatus_broker.livestatus.handle_request(query, "mongo")
@@ -90,17 +91,10 @@ class TestConfigBig(TestConfig):
         else:
             self.assertEqual(pyresponse, expected_result)
 
-    def test_simple_query(self):
+    def _test_simple_query(self):
         """
         Tests a simple query execution
         """
-        host_005 = self.sched.hosts.find_by_name("test_host_001")
-        self.assertEqual(host_005.host_name, "test_host_001")
-        test_ok_00 = self.sched.services.find_srv_by_name_and_hostname("test_host_001", "test_ok_00")
-        self.assertEqual(test_ok_00.host_name, "test_host_001")
-        self.assertEqual(test_ok_00.service_description, "test_ok_00")
-
-        # Get an host
         # Exact match
         expected_result = [['test_host_001', 'pending_001']]
         query = """GET hosts
@@ -332,7 +326,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
-    def test_nested_and_or_query(self):
+    def _test_nested_and_or_query(self):
         """
         Tests a simple query execution
         """
@@ -402,69 +396,55 @@ OutputFormat: python
         expected_result = []
         self.execute_and_assert(query, expected_result)
 
-    def _test_negate(self):
-        # test_host_005 is in hostgroup_01
-        # 20 services   from  400 services
-        hostgroup_01 = self.sched.hostgroups.find_by_name("hostgroup_01")
-        self.assertEqual(hostgroup_01.hostgroup_name, "hostgroup_01")
-        host_005 = self.sched.hosts.find_by_name("test_host_005")
-        self.assertEqual(hostgroup_01.hostgroup_name, "hostgroup_01")
-        test_ok_00 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
-        query = """GET services
-Columns: host_name description
-Filter: host_name = test_host_005
-Filter: description = test_ok_00
+    def test_negate(self):
+        expected_result = [['test_host_001', 'pending_001']]
+        # List matches (case insensitive)
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name = test_host_001
+Filter: notification_options ~~ ^U$
 OutputFormat: python
 """
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(query)
-        pyresponse = eval(response)
-        print("PyResponse1: %s" % pyresponse)
-        response2, keepalive = self.livestatus_broker.livestatus.handle_request(query, "mongo")
-        print("Response2: %s" % response2)
-        pyresponse2 = eval(response2)
-        print("PyResponse2: %s" % pyresponse2)
-        return
+        expected_result = [['test_host_001', 'pending_001']]
+        self.execute_and_assert(query, expected_result)
 
-        query = """GET services
-Columns: host_name description
-OutputFormat: python
-"""
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(query)
-        allpyresponse = eval(response)
-        print len(allpyresponse)
-        query = """GET services
-Columns: host_name description
-Filter: host_name = test_host_005
-Filter: description = test_ok_00
-And: 2
-Negate:
-OutputFormat: python
-"""
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(query)
-        negpyresponse = eval(response)
-        print len(negpyresponse)
-        # only test_ok_00 + without test_ok_00 must be all services
-        self.assertEqual(len(pyresponse) + len(negpyresponse), len(allpyresponse) )
+        def negate_hosts_condition(result):
+            self.assertNotIn(['test_host_001', 'pending_001'], result)
+            self.assertIn(['test_host_002', 'down_002'], result)
 
         query = """GET hosts
-Columns: host_name num_services
-Filter: host_name = test_host_005
-OutputFormat: python
-"""
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(query)
-        numsvc = eval(response)
-        print response, numsvc
-
-        query = """GET services
-Columns: host_name description
-Filter: host_name = test_host_005
-Filter: description = test_ok_00
+Columns: host_name alias
+Filter: host_name = test_host_001
+Filter: notification_options ~~ ^U$
 Negate:
 OutputFormat: python
 """
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(query)
-        numsvcwithout = eval(response)
-        self.assertEqual(len(numsvcwithout), numsvc[0][1] - 1 )
+        self.execute_and_assert(query, negate_hosts_condition)
+
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name != test_host_001
+Filter: alias !~~ pending_001
+Negate:2
+Filter: notification_options < d
+Filter: notification_options !~~ ^U$
+Negate: 2
+OutputFormat: python
+"""
+        self.execute_and_assert(query, expected_result)
+
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name != test_host_001
+Filter: alias !~~ pending_001
+Negate:2
+Filter: notification_options < d
+Filter: notification_options !~~ ^U$
+Negate: 2
+Negate:
+OutputFormat: python
+"""
+        self.execute_and_assert(query, negate_hosts_condition)
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01

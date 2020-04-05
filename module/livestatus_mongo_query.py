@@ -576,7 +576,9 @@ class LiveStatusMongoQuery(object):
             })
         else:
             stack.append({
-                attribute: reference
+                attribute: {
+                    "$eq": reference
+                }
             })
 
     def add_mongo_filter_eq_ci(self, stack, attribute, reference):
@@ -648,9 +650,7 @@ class LiveStatusMongoQuery(object):
         if datatype is list:
             stack.append({
                 attribute: {
-                    "$not": {
-                        "$in": [reference]
-                    }
+                    "$nin": [reference]
                 }
             })
         else:
@@ -690,9 +690,7 @@ class LiveStatusMongoQuery(object):
         if datatype is list:
             stack.append({
                 attribute: {
-                    "$not": {
-                        "$in": [re.compile("^%s$" % reference, re.IGNORECASE)]
-                    }
+                    "$nin": [re.compile("^%s$" % reference, re.IGNORECASE)]
                 }
             })
         else:
@@ -963,9 +961,9 @@ class LiveStatusMongoQuery(object):
         del stack[-count:]
         stack.append(or_filter)
 
-    def stack_mongo_filter_negate(self, stack, count):
+    def stack_mongo_filter_negate(self, stack, count, wrap=True):
         """
-        Inverts the logic of the last `count` operators
+        Inverts the logic of the previous filters stack
 
         As there's no global $not operator in MongoDB query ($not can only
         be applied to an attribute), we're forced to negate by inverting
@@ -973,41 +971,86 @@ class LiveStatusMongoQuery(object):
 
         :param list stack: The stack to append filter to
         :param int count: The number of statements to negate
+        :param bool wrap: Should the result be wrapped in an "$or"
         """
-        if count:
-            global_negate = False
-        else:
-            # A negate without count has been inserted
-            # Negate:
+        if not count:
             count = len(stack)
-            global_negate = True
         if len(stack) < count:
             raise LiveStatusQueryError(452, 'No enough filters to stack into `negate`')
         # Negates each element in the stack
         for i in range(len(stack)-count, len(stack)):
             statement = stack[i]
-            for attribute in statement:
-                # Manages $and and $or statements
-                reversed_attributes = {"$or": "$and", "$and": "$or"}
-                if attribute in reversed_attributes:
-                    # $or becomes $and and conversely
-                    reversed_attribute = reversed_attributes[attribute]
-                    reversed_stack = statement[attribute]
-                    self.stack_mongo_filter_negate(
-                        reversed_stack,
-                        len(reversed_stack)
-                    )
-                    stack[i] = {
-                        reversed_attribute: reversed_stack
-                    }
-                else:
-                    # Manages direct attribute statements
-                    statement[attribute] = {"$not": statement[attribute]}
-        # The whole query negation has been requested
-        # Negate:
-        if global_negate is True:
-            reversed_stack = list(stack)
-            del stack[:]
+            stack[i] = self.stack_mongo_filter_negate_statement(statement)
+        if wrap is True:
+            reversed_stack = list(stack[-count:])
+            del stack[-count:]
             stack.append({
                 "$or": reversed_stack
             })
+        return stack
+
+    def stack_mongo_filter_negate_statement(self, statement):
+        """
+        Inverts the logic of a single statement
+
+        As there's no global $not operator in MongoDB query ($not can only
+        be applied to an attribute), we're forced to negate by inverting
+        the query logic itself.
+
+        :param dict statement: The statement to negate
+        :rtype: dict
+        :return: The negated statement
+        """
+        print("Negate statement: %s" % statement)
+        reversed_operators = {
+            "$eq": "$ne",
+            "$ne": "$eq",
+            "$gt": "$le",
+            "$le": "$gt",
+            "$ge": "$lt",
+            "$lt": "$ge",
+            "$in": "$nin",
+            "$nin": "$in",
+            "$or": "$and",
+            "$and": "$or",
+        }
+        for attribute, comparator in list(statement.items()):
+            if attribute in ("$and", "$or"):
+                print("Reversing $and or $or")
+                # Manages $and, $or, and other grouping statements
+                # Statement has pattern: {"$or": [...]} or {"$and": [...]}
+                # $or becomes $and and conversely
+                reversed_operator = reversed_operators[attribute]
+                stack = list(statement[attribute])
+                # There can't both $and or $or with another operartor
+                # Returning the value directly
+                return {
+                    reversed_operator: self.stack_mongo_filter_negate(
+                        stack=stack,
+                        count=len(stack),
+                        wrap=False
+                    )
+                }
+            # Statement has pattern: {field: comparator}
+            if isinstance(comparator, dict):
+                # Statement has pattern: {field: {"$eq": value}}
+                # {"$eq": value} becomes {"$ne": value} and so on...
+                for operator, value in list(comparator.items()):
+                    if operator == "$not":
+                        # Statement has pattern: {field: {"$not": value}}
+                        # {field: {"$not": value}} becomes {field: value}
+                        statement[attribute] = value
+                        break
+                    if operator not in reversed_operators:
+                        raise LiveStatusQueryError(452, 'Cannot negate statement %s' % statement)
+                    reversed_operator = reversed_operators[operator]
+                    del comparator[operator]
+                    comparator[reversed_operator] = value
+            else:
+                # Statement has pattern: {field: value}
+                # {field: value} becomes {field: {"$not": value}}
+                statement[attribute] = {
+                    "$not": statement[attribute]
+                }
+        print("Negate result: %s" % statement)
+        return statement
