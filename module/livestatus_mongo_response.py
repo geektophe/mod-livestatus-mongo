@@ -222,6 +222,7 @@ class LiveStatusMongoResponse:
 
         for item in result:
             row = []
+            print("Columns: %s" % columns)
             for column in columns:
                 mapping = table_class_map[self.query.table][column]
                 if "function" in mapping:
@@ -232,7 +233,11 @@ class LiveStatusMongoResponse:
                     value = mapping["datatype"](value)
                 row.append(value)
             rows.append(row)
-        if self.outputformat == "csv":
+        if self.outputformat == "json":
+            return json.dumps(rows)
+        if self.outputformat.startswith("python"):
+            return repr(rows)
+        else:
             f = StringIO()
             writer = csv.writer(f,
                 delimiter=self.separators.field,
@@ -240,10 +245,20 @@ class LiveStatusMongoResponse:
             )
             writer.writerow(rows)
             return f.getvalue()
-        if self.outputformat.startswith("python"):
-            return repr(rows)
+
+    def format_live_data_stats(self, result, columns, aliases):
+        if self.outputformat == "json":
+            return json.dumps(result)
+        elif self.outputformat.startswith("python"):
+            return repr(result)
         else:
-            return json.dumps(rows)
+            f = StringIO()
+            writer = csv.writer(f,
+                delimiter=self.separators.field,
+                lineterminator=self.separators.line
+            )
+            writer.writerow(result)
+            return f.getvalue()
 
     def format_live_data(self, result, columns, aliases):
         '''
@@ -254,72 +269,6 @@ class LiveStatusMongoResponse:
         :return:
         '''
         if self.query.stats_query:
-            return self.format_live_data_stats(result, columns, aliases)
+            self.output = self.format_live_data_stats(result, columns, aliases)
         else:
             self.output = self.format_live_data_items(result, columns, aliases)
-
-
-    def format_live_data_stats(self, result, columns, aliases):
-        showheader = False
-        lines = LiveStatusListResponse()
-        if self.outputformat == 'csv':
-            # statsified results always have columns (0, 1, 2, ...)
-            for item in result:
-
-                # Construct one line of output for each object found
-                l = []
-                for value in [item[c] for c in columns]:
-                    if isinstance(value, list):
-                        l.append(self.separators.list.join(str(y) for y in value))
-                    elif isinstance(value, bool):
-                        l.append('1' if value else '0')
-                    else:
-                        try:
-                            l.append(str(value))
-                        except UnicodeEncodeError as err:
-                            logger.warning('UnicodeEncodeError on str() of: %r : %s' % (value, err))
-                            l.append(value.encode("utf-8", "replace"))
-                        except Exception as err:
-                            logger.warning('Unexpected error on str() of: %r : %s' % (value, err))
-                            l.append("")
-                lines.append(self.separators.field.join(l) + self.separators.line)
-            # end for item in result
-
-            if len(lines) > 0:
-                lines[-1] = lines[-1][:-1] # skip last added separator
-                if self.columnheaders != 'off' or len(columns) == 0:
-                    if len(aliases) > 0:
-                        showheader = True
-                    else:
-                        showheader = True
-                        if len(columns) == 0:
-                            # Show all available columns
-                            #columns = sorted(object.keys())
-                            pass
-            elif self.columnheaders == 'on':
-                showheader = True
-
-            if showheader:
-                lines.insert(0, self.separators.field.join(
-                    (str(aliases[col]) for col in columns) if len(aliases)
-                    else columns))
-                lines[0] += self.separators.line
-
-            self.output.append(lines)
-
-        elif self.outputformat == 'json' or self.outputformat == 'python':
-            encode = dumps if self.outputformat == 'json' else str
-            for item in result:
-                #lines = self._compact(lines)
-                rows = []
-                for c in columns:
-                    if isinstance(item[c], bool):
-                        rows.append(1 if item[c] else 0)
-                    else:
-                        rows.append(item[c])
-                lines.append(rows)
-
-            if self.columnheaders == 'on':
-                lines.insert(0, (str(aliases[col]) for col in columns) if len(aliases) else columns)
-
-            self.output.append(encode(lines))

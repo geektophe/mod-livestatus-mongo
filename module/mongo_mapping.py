@@ -176,11 +176,13 @@ livestatus_attribute_map = {
             'description': 'Whether passive host checks are accepted (0/1)',
             'function': lambda item: item["passive_checks_enabled"],
             'datatype': bool,
+            'filter': 'passive_checks_enabled',
         },
         'acknowledged': {
             'description': 'Whether the current host problem has been acknowledged (0/1)',
             'function': lambda item: item["problem_has_been_acknowledged"],
             'datatype': bool,
+            'filter': 'problem_has_been_acknowledged',
         },
         'acknowledgement_type': {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
@@ -250,6 +252,7 @@ livestatus_attribute_map = {
             'description': 'Whether checks of the host are enabled (0/1)',
             'function': lambda item: item["active_checks_enabled"],
             'datatype': bool,
+            'filter': 'active_checks_enabled',
         },
         'child_dependencies': {
             'description': 'List of the host/service that depend on this host (logical, network or business one).',
@@ -285,11 +288,13 @@ livestatus_attribute_map = {
             'description': 'The importance we gave to this host between the minimum 0 and the maximum 5',
             'function': lambda item: item["business_impact"],
             'datatype': int,
+            'filter': 'business_impact',
         },
         'current_attempt': {
             'description': 'Number of the current check attempts',
             'function': lambda item: item["attempt"],
             'datatype': int,
+            'filter': 'attempt'
         },
         'current_notification_number': {
             'description': 'Number of the current notification',
@@ -364,6 +369,7 @@ livestatus_attribute_map = {
             'description': 'A list of all host groups this host is in',
             'function': lambda item: item["hostgroups"],
             'datatype': list,
+            'filter': 'hostgroups'
         },
         'hard_state': {
             'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
@@ -443,13 +449,14 @@ livestatus_attribute_map = {
         },
         'last_check': {
             'description': 'Time of the last check (Unix timestamp)',
-            'function': lambda item: int(item.last_chk),
+            'function': lambda item: int(item["last_chk"]),
             'datatype': int,
         },
         'last_hard_state': {
             'description': 'Last hard state',
             'function': lambda item: item["last_hard_state_id"],
             'datatype': int,
+            'filter': 'last_hard_state_id',
         },
         'last_hard_state_change': {
             'description': 'Time of the last hard state change (Unix timestamp)',
@@ -458,7 +465,7 @@ livestatus_attribute_map = {
         },
         'last_notification': {
             'description': 'Time of the last notification (Unix timestamp)',
-            'function': lambda item: int(item.last_notification),
+            'function': lambda item: item["last_notification"],
             'datatype': int,
         },
         'last_state': {
@@ -468,7 +475,7 @@ livestatus_attribute_map = {
         },
         'last_state_change': {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
-            'function': lambda item: int(item.last_state_change),
+            'function': lambda item: item["last_state_change"],
             'datatype': int,
         },
         'last_time_down': {
@@ -494,6 +501,7 @@ livestatus_attribute_map = {
         'long_plugin_output': {
             'description': 'Complete output from check plugin',
             'function': lambda item: item["long_output"],
+            'filter': 'long_output',
         },
         'low_flap_threshold': {
             'description': 'Low threshold of flap detection',
@@ -518,11 +526,13 @@ livestatus_attribute_map = {
         'name': {
             'description': 'Host name',
             'function': lambda item: item["host_name"],
+            'filter': 'host_name',
         },
         'next_check': {
             'description': 'Scheduled time for the next check (Unix timestamp)',
-            'function': lambda item: item.next_chk,
+            'function': lambda item: item["next_chk"],
             'datatype': int,
+            'filter': 'next_chk'
         },
         'next_notification': {
             'description': 'Time of the next notification (Unix timestamp)',
@@ -641,6 +651,7 @@ livestatus_attribute_map = {
         'plugin_output': {
             'description': 'Output of the last host check',
             'function': lambda item: item["output"],
+            'filter': 'output'
         },
         'pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this host (0/1)',
@@ -694,13 +705,14 @@ livestatus_attribute_map = {
         'state': {
             'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
             'function': lambda item: item["state_id"],
-            #'function': i_am_state,
             'datatype': int,
+            'filter': 'state_id',
         },
         'state_type': {
             'description': 'Type of the current state (0: soft, 1: hard)',
             'function': lambda item: item["state_type_id"],
             'datatype': int,
+            'filter': 'state_type_id',
         },
         'statusmap_image': {
             'description': 'The name of in image file for the status map',
@@ -747,11 +759,13 @@ livestatus_attribute_map = {
             'description': 'Whether the service accepts passive checks (0/1)',
             'function': lambda item: item["passive_checks_enabled"],
             'datatype': bool,
+            'filter': 'passive_checks_enabled',
         },
         'acknowledged': {
             'description': 'Whether the current service problem has been acknowledged (0/1)',
             'function': lambda item: item["problem_has_been_acknowledged"],
             'datatype': bool,
+            'filter': 'problem_has_been_acknowledged',
         },
         'acknowledgement_type': {
             'description': 'The type of the acknownledgement (0: none, 1: normal, 2: sticky)',
@@ -803,6 +817,7 @@ livestatus_attribute_map = {
             'description': 'Whether active checks are enabled for the service (0/1)',
             'function': lambda item: item["active_checks_enabled"],
             'datatype': bool,
+            'filter': 'active_checks_enabled',
         },
         'child_dependencies': {
             'description': 'List of the host/service that depend on this service (logical, network or business one).',
@@ -833,11 +848,13 @@ livestatus_attribute_map = {
             'description': 'The importance we gave to this service between the minimum 0 and the maximum 5',
             'function': lambda item: item["business_impact"],
             'datatype': int,
+            'filter': 'business_impact',
         },
         'current_attempt': {
             'description': 'The number of the current check attempt',
             'function': lambda item: item["attempt"],
             'datatype': int,
+            'filter': 'attempt',
         },
         'current_notification_number': {
             'description': 'The number of the current notification',
@@ -862,6 +879,7 @@ livestatus_attribute_map = {
         'description': {
             'description': 'Description of the service (also used as key)',
             'function': lambda item: item["service_description"],
+            'filter': 'service_description',
         },
         'display_name': {
             'description': 'An optional display name (not used by Nagios standard web pages)',
@@ -910,6 +928,7 @@ livestatus_attribute_map = {
             'description': 'A list of all service groups the service is in',
             'function': lambda item: item["servicegroups"],
             'datatype': list,
+            'filter': 'servicegroups',
         },
         'has_been_checked': {
             'description': 'Whether the service already has been checked (0/1)',
@@ -1352,12 +1371,13 @@ livestatus_attribute_map = {
         },
         'latency': {
             'description': 'Time difference between scheduled check time and actual check time',
-            'function': lambda item: int(item.latency),
+            'function': lambda item: item["latency"],
             'datatype': int,
         },
         'long_plugin_output': {
             'description': 'Unabbreviated output of the last check plugin',
             'function': lambda item: item["long_output"],
+            'filter': 'long_output',
         },
         'low_flap_threshold': {
             'description': 'Low threshold of flap detection',
@@ -1383,6 +1403,7 @@ livestatus_attribute_map = {
             'description': 'The scheduled time of the next check (Unix timestamp)',
             'function': lambda item: item["next_chk"],
             'datatype': int,
+            'filter': 'next_chk'
         },
         'next_notification': {
             'description': 'The time of the next notification (Unix timestamp)',
@@ -1451,6 +1472,7 @@ livestatus_attribute_map = {
         'plugin_output': {
             'description': 'Output of the last check plugin',
             'function': lambda item: item["output"],
+            'filter': 'output',
         },
         'pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this service (0/1)',
@@ -1489,11 +1511,13 @@ livestatus_attribute_map = {
             'description': 'The current state of the service (0: OK, 1: WARN, 2: CRITICAL, 3: UNKNOWN)',
             'function': lambda item: item["state_id"],
             'datatype': int,
+            'filter': 'state_id',
         },
         'state_type': {
             'description': 'The type of the current state (0: soft, 1: hard)',
             'function': lambda item: item["state_type_id"],
             'datatype': int,
+            'filter': 'state_type_id',
         },
     },
     'Hostgroup': {
@@ -1522,6 +1546,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'Name of the hostgroup',
             'function': lambda item: item["hostgroup_name"],
+            'filter': 'hostgroup_name',
         },
         'notes': {
             'description': 'Optional notes to the hostgroup',
@@ -1629,6 +1654,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the service group',
             'function': lambda item: item["servicegroup_name"],
+            'filter': 'servicegroup_name',
         },
         'notes': {
             'description': 'Optional additional notes about the service group',
@@ -1792,6 +1818,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The login name of the contact person',
             'function': lambda item: item["contact_name"],
+            'filter': 'contact_name',
         },
         'pager': {
             'description': 'The pager address of the contact',
@@ -1830,6 +1857,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the contactgroup',
             'function': lambda item: item["contactgroup_name"],
+            'filter': 'contactgroup_name',
         },
     },
     'Timeperiod': {
@@ -1845,6 +1873,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the timeperiod',
             'function': lambda item: item["timeperiod_name"],
+            'filter': 'timeperiod_name',
         },
     },
     'Command': {
@@ -1859,10 +1888,12 @@ livestatus_attribute_map = {
         'line': {
             'description': 'The shell command line',
             'function': lambda item: item["command_line"],
+            'filter': 'command_line',
         },
         'name': {
             'description': 'The name of the command',
             'function': lambda item: item["command_name"],
+            'filter': 'command_name',
         },
     },
     'SchedulerLink': {
@@ -1878,6 +1909,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the scheduler',
             'function': lambda item: item["scheduler_name"],  # REPAIRME
+            'filter': 'scheduler_name',
         },
         'port': {
             'description': 'The TCP port of the scheduler',
@@ -1912,6 +1944,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the poller',
             'function': lambda item: item["poller_name"],  # REPAIRME
+            'filter': 'poller_name',
         },
         'poller_name': {
             'description': 'The name of the poller',
@@ -1941,6 +1974,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the reactionner',
             'function': lambda item: item["reactionner_name"],  # REPAIRME
+            'filter': 'reactionner_name',
         },
         'port': {
             'description': 'The TCP port of the reactionner',
@@ -1974,6 +2008,7 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the broker',
             'function': lambda item: item["broker_name"],  # REPAIRME
+            'filter': 'broker_name',
         },
         'port': {
             'description': 'The TCP port of the broker',

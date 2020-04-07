@@ -26,6 +26,7 @@
 from shinken.util import safe_print
 from shinken.misc.sorter import hst_srv_sort, last_state_change_earlier
 from shinken.misc.filter import only_related_to
+from pprint import pprint
 
 class DataManager(object):
     def __init__(self):
@@ -45,12 +46,245 @@ class DataManager(object):
             return obj
 
     def manage_brok(self, brok):
-        return
-        # Filters broks to manage
-        brok_stage = brok.type.split("_")[0]
-        if brok_stage not in ("initial", "update") or not brok.type.endswith("_status"):
-            return
+        """
+        Manages a received brok
+
+        :param Brok brok: The brok to manage
+        """
+        handler_name = "manage_%s_brok" % brok.type
+        handler = getattr(self, handler_name, None)
+        if handler is not None:
+            handler(brok)
+
+    def manage_program_status_brok(self, brok):
+        """
+        Display brok content
+
+        :param Brok brok: The brok object to update object from
+        """
+        print("Brok: %s" % brok.type)
+        pprint(brok.data)
+
+    def manage_initial_host_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("host", brok)
+
+    def manage_initial_hostgroup_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("hostgroup", brok)
+
+    def manage_initial_service_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("service", brok)
+
+    def manage_initial_servicegroup_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("servicegroup", brok)
+
+    def manage_initial_contact_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("contact", brok)
+
+    def manage_initial_contactgroup_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("contactgroup", brok)
+
+    def manage_initial_timeperiod_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("timeperiod", brok)
+
+    def manage_initial_command_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("command", brok)
+
+    def manage_initial_scheduler_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("scheduler", brok)
+
+    def manage_initial_poller_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("poller", brok)
+
+    def manage_initial_reactionner_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("reactionner", brok)
+
+    def manage_initial_broker_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("broker", brok)
+
+    def manage_initial_receiver_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("receiver", brok)
+
+    def manage_initial_broks_done_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        print("Brok: %s" % brok.type)
+        pprint(brok.data)
+
+    def manage_update_program_status_brok(self, brok):
+        """
+        Display brok content
+
+        :param Brok brok: The brok object to update object from
+        """
+        print("Brok: %s" % brok.type)
+        pprint(brok.data)
+
+    def manage_update_host_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("host", brok)
+
+    def manage_update_service_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("service", brok)
+
+    def manage_update_broker_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("broker", brok)
+
+    def manage_update_receiver_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("receiver", brok)
+
+    def manage_update_reactionner_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("reactionner", brok)
+
+    def manage_update_poller_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("poller", brok)
+
+    def manage_update_scheduler_status_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("scheduler", brok)
+
+    def manage_host_check_result_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("host", brok)
+
+    def manage_host_next_schedule_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("host", brok)
+
+    def manage_service_check_result_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("service", brok)
+
+    def manage_service_next_schedule_brok(self, brok):
+        """
+        Updates and object from the brok data
+
+        :param Brok brok: The brok object to update object from
+        """
+        self.update_object("service", brok)
+
+    def update_object(self, object_type, brok):
+        """
+        Updates and object in the database from the brok data
+
+        :param str objct_type: The object type
+        :param Brok brok: The brok object to update object from
+        """
         # Parses brok
+        if brok.data.get("host_name") == "test_host_005" and brok.data.get("service_description") == "test_ok_00":
+            pprint(brok.data)
         data = {}
         for name, value in brok.data.items():
             if name == "dateranges":
@@ -58,28 +292,55 @@ class DataManager(object):
             else:
                 data[name] = self.normalize(value)
         # Insert brok into database
-        obj_type = brok.type.split("_")[1]
         # Services are particular because their name is a combination of
         # host_name and service_description
-        if obj_type == "service":
-            obj_name = "%s/%s" % (data["host_name"], data["service_description"])
+        if object_type == "service":
+            object_name = "%s/%s" % (
+                data["host_name"],
+                data["service_description"]
+            )
         else:
-            obj_name = data["%s_name" % obj_type]
-        data["_id"] = obj_name
-        collection = getattr(self.db, "%ss" % obj_type)
-        obj = col.count({"_id": obj_name})
-        if not obj:
-            col.insert_one(data)
+            object_name = data["%s_name" % object_type]
+        collection = getattr(self.db, "%ss" % object_type)
+        count = collection.count({"_id": object_name})
+        if not count:
+            data["_id"] = object_name
+            collection.insert_one(data)
         else:
-            obj.update(data)
-            col.replace_one({"_id": obj_name}, obj)
+            collection.update(
+                {"_id": object_name},
+                {"$set": data}
+            )
 
-    def find(self, table, query, aggregation=None):
+    def find(self, table, query):
+        """
+        General purpose MongoDB find() query
+
+        :rtype: iterator
+        :return: The query result
+        """
         collection = getattr(self.db, table)
-        if aggregation is None:
-            return collection.find(query)
-        else:
-            return collection.find(query, aggregation)
+        return collection.find(query)
+
+    def count(self, table, query):
+        """
+        General purpose MongoDB count() query
+
+        :rtype: iterator
+        :return: The query result
+        """
+        collection = getattr(self.db, table)
+        return collection.count(query)
+
+    def aggregate(self, table, query):
+        """
+        General purpose MongoDB aggregate() query
+
+        :rtype: iterator
+        :return: The query result
+        """
+        collection = getattr(self.db, table)
+        return collection.aggregate(query)
 
     # UI will launch us names in str, we got unicode
     # in our rg, so we must manage it here

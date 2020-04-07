@@ -114,7 +114,6 @@ class LiveStatusMongoQuery(object):
         self.mongo_filters = []
         self.mongo_aggregations = []
         self.mongo_stats_filters = []
-        self.mongo_stats_aggregations = []
 
     def __str__(self):
         output = "LiveStatusRequest:\n"
@@ -145,7 +144,7 @@ class LiveStatusMongoQuery(object):
         else:
             return re.sub(re.sub('s$', '', self.table) + '_', '', column, 1)
 
-    def parse_filter_line(self, line, aggregations=False):
+    def parse_filter_line(self, line):
         """
         Map some operators to theyr complementary form to reduce the cases
         to manage.
@@ -180,11 +179,10 @@ class LiveStatusMongoQuery(object):
         # Stats: avg execution_time
         # Stats: avg execution_time = ...
         # Stats: avg execution_time as exec_time
-        elif attribute in ['sum', 'min', 'max', 'avg', 'std'] and aggregations is True:
+        elif attribute in ['sum', 'min', 'max', 'avg', 'std']:
             operator, attribute = attribute, operator
             if reference.startswith('as '):
                 _, alias = reference.split(' ', 2)
-                self.aliases.append(alias)
             return attribute, operator, None
         else:
             raise LiveStatusQueryError(452, 'invalid filter: %s' % line)
@@ -273,14 +271,12 @@ class LiveStatusMongoQuery(object):
                 self.stats_query = True
                 try:
                     attribute, operator, reference = self.parse_filter_line(line)
-                    filters = self.add_mongo_filter(
+                    self.add_mongo_filter(
                         self.mongo_stats_filters,
                         operator,
                         attribute,
                         reference
                     )
-                    self.mongo_filters.extend(filters["filters"])
-                    self.mongo_aggregations.extend(filters["aggregations"])
                 except Exception as e:
                     logger.warning("[Livestatus Query] Illegal operation: %s" % e)
                     raise
@@ -289,12 +285,12 @@ class LiveStatusMongoQuery(object):
                 _, andnum = self.split_option(line)
                 self.stack_mongo_filter_and(self.mongo_stats_filters, andnum)
             elif keyword == 'StatsOr':
-                _, andnum = self.split_option(line)
+                _, ornum = self.split_option(line)
                 self.stack_mongo_filter_or(self.mongo_stats_filters, ornum)
             elif keyword == 'StatsNegate':
                 _, notnum = self.split_option(line)
                 self.stack_mongo_filter_negate(
-                    self.mongo_stats_aggregations,
+                    self.mongo_stats_filters,
                     notnum
                 )
             elif keyword == 'Separators':
@@ -312,6 +308,8 @@ class LiveStatusMongoQuery(object):
 
     def process_query(self):
         result = self.launch_query()
+        print("* Result:")
+        pprint(result)
         self.response.format_live_data(result, self.columns, self.aliases)
         return self.response.respond()
 
@@ -325,26 +323,11 @@ class LiveStatusMongoQuery(object):
         if not self.table:
             return []
 
-        if self.stats_query:
-            if len(self.columns) > 0:
-                # StatsGroupBy is deprecated. Columns: can be used instead
-                self.stats_group_by = self.columns
-            elif len(self.stats_group_by) > 0:
-                self.columns = self.stats_group_by + self.stats_columns
-            #if len(self.stats_columns) > 0 and len(self.columns) == 0:
-            if len(self.stats_columns) > 0:
-                self.columns = self.stats_columns + self.columns
-        else:
-            if len(self.columns) == 0:
-                self.outputcolumns = list_livestatus_attributes(self.table)
-            else:
-                self.outputcolumns = self.columns
-
         try:
             # Remember the number of stats filters. We need these numbers as columns later.
             # But we need to ask now, because get_live_data() will empty the stack
             if self.table == 'log':
-                result = self.get_live_data_log(cs)
+                return self.get_live_data_log(cs)
             else:
                 # If the pnpgraph_present column is involved, then check
                 # with each request if the pnp perfdata path exists
@@ -352,30 +335,13 @@ class LiveStatusMongoQuery(object):
                     self.pnp_path_readable = True
                 else:
                     self.pnp_path_readable = False
-                result = self.get_live_data()
-            if self.stats_query:
-                self.columns = range(num_stats_filters)
-                if self.stats_group_by:
-                    self.columns = tuple(list(self.stats_group_by) + list(self.columns))
-                if len(self.aliases) == 0:
-                    # If there were Stats: statements without "as", show no column headers at all
-                    self.response.columnheaders = 'off'
-                else:
-                    self.response.columnheaders = 'on'
-
-            if self.table == 'columns':
-                # With stats_request set to True, format_output expects result
-                # to be a list of dicts instead a list of objects
-                self.stats_query = True
-
+                return self.get_live_data()
         except Exception, e:
             import traceback
             logger.error("[Livestatus Query] Error: %s" % e)
             logger.debug("[Livestatus Query] %s" % traceback.format_exc())
             traceback.print_exc(32)
-            result = []
-
-        return result
+            return []
 
     def get_table(self, table_name):
         """
@@ -385,9 +351,23 @@ class LiveStatusMongoQuery(object):
         """
         return self.datamgr.rg.get_table(table_name)
 
-    def get_filtered_livedata(self):
+    def execute_mongo_query(self):
         """
-        Retrieves direct hosts or services from the mongo database
+        Check input parameters, and get queries depending on the query
+        requested
+        """
+        if self.mongo_stats_filters:
+            return self.execute_mongo_aggregation_query()
+        else:
+            return self.execute_mongo_filter_query()
+
+    def get_mongo_filter_query(self):
+        """
+        Generates the final filter query from the list of queries in
+        mongo_filters
+
+        :rtype: dict
+        :return: The filter query
         """
         if self.mongo_filters:
             if len(self.mongo_filters) > 1:
@@ -396,9 +376,103 @@ class LiveStatusMongoQuery(object):
                 query = self.mongo_filters[0]
         else:
             query = {}
-        print("Mongo query: table: %s" % self.table)
+        return query
+
+    def execute_mongo_filter_query(self):
+        """
+        Execute a filter query
+        """
+        print("Mongo filter query: table: %s" % self.table)
+        query = self.get_mongo_filter_query()
         pprint(query)
         return self.mongo_datamgr.find(self.table, query)
+
+    def execute_mongo_stats_query(self):
+        """
+        Execute a filter query
+        """
+        results = []
+        filter_query = self.get_mongo_filter_query()
+        for stats_query in self.mongo_stats_filters:
+            if filter_query:
+                query = {
+                    "$and": [
+                        filter_query,
+                        stats_query
+                    ]
+                }
+            else:
+                query = stats_query
+            print("Mongo stats query: table: %s" % self.table)
+            pprint(query)
+            count = self.mongo_datamgr.count(self.table, query)
+            results.append(count)
+        return results
+
+    def get_mongo_aggregation_query(self, filter_query, query):
+        """
+        Generates the final aggregation query from the list of queries in
+        mongo_stats_filters
+
+        :param dict filter_query: The initial filter query limitting the
+                                  aggregation scope
+        :param list,dict query: The aggregation/stats query
+        :rtype: list
+        :return: The aggregation query
+        """
+        print("* Stats query")
+        pprint(query)
+        if isinstance(query, list):
+            # The query is already an aggregation
+            query.insert(0, {
+                "$match": filter_query
+            })
+        else:
+            # The query is a stat filter, and needs to be enclosed in a count
+            # aggregation
+            stack = []
+            self.add_mongo_aggregation_count(stack)
+            aggregation_query = stack.pop()
+            if filter_query:
+                aggregation_query.insert(0, {
+                    "$match": {
+                        "$and": [
+                            filter_query,
+                            query
+                        ]
+                    }
+                })
+            else:
+                aggregation_query.insert(0, {
+                    "$match": query
+                })
+            query = aggregation_query
+        return query
+
+    def execute_mongo_aggregation_query(self):
+        """
+        Execute an aggregation query
+
+        There's 2 distinct Stats queries:
+
+        - The attribute = value stats that is in fact
+        """
+        results = []
+        filter_query = self.get_mongo_filter_query()
+        # If no aggregation has been
+        for query in self.mongo_stats_filters:
+            query = self.get_mongo_aggregation_query(filter_query, query)
+            print("Mongo aggregation query: table: %s" % self.table)
+            pprint(query)
+            for result in self.mongo_datamgr.aggregate(self.table, query):
+                results.append(result["result"])
+        return results
+
+    def get_filtered_livedata(self):
+        """
+        Retrieves direct hosts or services from the mongo database
+        """
+        return self.execute_mongo_query()
 
     def get_list_livedata(self, cs):
         t = self.table
@@ -561,6 +635,32 @@ class LiveStatusMongoQuery(object):
             items = gen_limit(items, self.limit)
         return items
 
+    def get_mongo_attribute_name(self, attribute):
+        """
+        Return the attribute name to use to query the mongo database.
+
+        Some attribute hold different names when requested through LQL, and
+        queried in mongo. Return the suitable attribute for Mongo query
+        from LQL.
+
+        :param str attribute: The LQL requested attribute
+        :rtype: str
+        :return: The attribute name to use in mongo query
+        """
+        return self.table_class_map[self.table][attribute].get(
+            "filter", attribute
+        )
+
+    def get_mongo_attribute_type(self, attribute):
+        """
+        Returns the attribute type, as shown in object mapping
+
+        :param str attribute: The LQL requested attribute
+        :rtype: type
+        :return: The attribute type
+        """
+        return self.table_class_map[self.table][attribute].get("datatype")
+
     def add_mongo_filter_eq(self, stack, attribute, reference):
         """
         Transposes an equalitiy operator filter into a mongo query
@@ -569,14 +669,21 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
             stack.append({
-                attribute: []
+                attrname: []
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {
+                    "$eq": attrtype(reference)
+                }
             })
         else:
             stack.append({
-                attribute: {
+                attrname: {
                     "$eq": reference
                 }
             })
@@ -590,11 +697,14 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attribute = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
             raise LiveStatusQueryError(452, 'operator not available for lists')
+        # Builds regular expression
+        reg = "^%s$" % reference
         stack.append({
-            attribute: re.compile("^%s$" % reference, re.IGNORECASE)
+            attrname: re.compile(reg, re.IGNORECASE)
         })
 
     def add_mongo_filter_reg(self, stack, attribute, reference):
@@ -605,16 +715,19 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attribute = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
             stack.append({
-                attribute: {
-                    "$in": [re.compile(reference)]
+                attrname: {
+                    "$in": [re.compile(reg)]
                 }
             })
         else:
             stack.append({
-                attribute: re.compile(reference)
+                attrname: re.compile(reg)
             })
 
     def add_mongo_filter_reg_ci(self, stack, attribute, reference):
@@ -626,16 +739,21 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
             stack.append({
-                attribute: {
-                    "$in": [re.compile(reference, re.IGNORECASE)]
+                attrname: {
+                    "$in": [
+                        re.compile(reg, re.IGNORECASE)
+                    ]
                 }
             })
         else:
             stack.append({
-                attribute: re.compile(reference, re.IGNORECASE)
+                attrname: re.compile(reg, re.IGNORECASE)
             })
 
     def add_mongo_filter_lt(self, stack, attribute, reference):
@@ -646,16 +764,17 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
             stack.append({
-                attribute: {
+                attrname: {
                     "$nin": [reference]
                 }
             })
         else:
             stack.append({
-                attribute: {"$lt": reference}
+                attrname: {"$lt": reference}
             })
 
     def add_mongo_filter_le(self, stack, attribute, reference):
@@ -666,16 +785,23 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
+            # Builds regular expression
+            reg = "^%s$" % reference
             stack.append({
-                attribute: {
-                    "$in": [re.compile("^%s$" % reference, re.IGNORECASE)]
+                attrname: {
+                    "$in": [re.compile(reg, re.IGNORECASE)]
                 }
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$lte": attrtype(reference)}
             })
         else:
             stack.append({
-                attribute: {"$lte": reference}
+                attrname: {"$lte": reference}
             })
 
     def add_mongo_filter_gt(self, stack, attribute, reference):
@@ -686,16 +812,23 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
+            # Builds regular expression
+            reg = "^%s$" % reference
             stack.append({
-                attribute: {
-                    "$nin": [re.compile("^%s$" % reference, re.IGNORECASE)]
+                attrname: {
+                    "$nin": [re.compile(reg, re.IGNORECASE)]
                 }
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$gt": attrtype(reference)}
             })
         else:
             stack.append({
-                attribute: {"$gt": reference}
+                attrname: {"$gt": reference}
             })
 
     def add_mongo_filter_ge(self, stack, attribute, reference):
@@ -706,14 +839,19 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
             stack.append({
-                attribute: {"$in": [reference]}
+                attrname: {"$in": [reference]}
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$gte": attrtype(reference)}
             })
         else:
             stack.append({
-                attribute: {"$gte": reference}
+                attrname: {"$gte": reference}
             })
 
     def add_mongo_filter_not_eq(self, stack, attribute, reference):
@@ -724,18 +862,19 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
             stack.append({
-                attribute: {
-                    "$ne": []
-                }
+                attrname: {"$ne": []}
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$ne": attrtype(reference)}
             })
         else:
             stack.append({
-                attribute: {
-                    "$ne": reference
-                }
+                attrname: {"$ne": reference}
             })
 
     def add_mongo_filter_not_eq_ci(self, stack, attribute, reference):
@@ -750,12 +889,15 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        if attrtype is list:
             raise LiveStatusQueryError(452, 'operator not available for lists')
+        # Builds regular expression
+        reg = "^%s$" % reference
         stack.append({
-            attribute: {
-                "$not": re.compile("^%s$" % reference, re.IGNORECASE)
+            attrname: {
+                "$not": re.compile(reg, re.IGNORECASE)
             }
         })
 
@@ -770,18 +912,19 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
             stack.append({
-                attribute: {
-                    "$nin": [re.compile(reference)]
+                attrname: {
+                    "$nin": [re.compile(reg)]
                 }
             })
         else:
             stack.append({
-                attribute: {
-                    "$not": re.compile(reference)
-                }
+                attrname: {"$not": re.compile(reg)}
             })
 
     def add_mongo_filter_not_reg_ci(self, stack, attribute, reference):
@@ -796,17 +939,20 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        datatype = self.table_class_map[self.table][attribute].get("datatype")
-        if datatype is list:
+        attrname = self.get_mongo_attribute_name(attribute)
+        attrtype = self.get_mongo_attribute_type(attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
             stack.append({
-                attribute: {
-                    "$nin": [re.compile(reference, re.IGNORECASE)]
+                attrname: {
+                    "$nin": [re.compile(reg, re.IGNORECASE)]
                 }
             })
         else:
             stack.append({
-                attribute: {
-                    "$not": re.compile(reference, re.IGNORECASE)
+                attrname: {
+                    "$not": re.compile(reg, re.IGNORECASE)
                 }
             })
 
@@ -820,7 +966,7 @@ class LiveStatusMongoQuery(object):
         """
         stack.append({})
 
-    def add_mongo_aggregation_sum(self, attribute, reference):
+    def add_mongo_aggregation_sum(self, stack, attribute, reference=None):
         """
         Transposes a stats sum aggregation into a mongo query
 
@@ -828,16 +974,25 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        stack.append({
-            "$group": {
-                "_id": "$item",
-                attrubte: {
-                    "$sum": "$%s" % attribute
+        attrname = self.get_mongo_attribute_name(attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$sum": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
                 }
             }
-        })
+        ])
 
-    def add_mongo_aggregation_max(self, attribute, reference):
+    def add_mongo_aggregation_max(self, stack, attribute, reference=None):
         """
         Transposes a stats max aggregation into a mongo query
 
@@ -845,16 +1000,25 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        stack.append({
-            "$group": {
-                "_id": "$item",
-                attrubte: {
-                    "$max": "$%s" % attribute
+        attrname = self.get_mongo_attribute_name(attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$max": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
                 }
             }
-        })
+        ])
 
-    def add_mongo_aggregation_min(self, attribute, reference):
+    def add_mongo_aggregation_min(self, stack, attribute, reference=None):
         """
         Transposes a stats min aggregation into a mongo query
 
@@ -862,16 +1026,25 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        stack.append({
-            "$group": {
-                "_id": "$item",
-                attrubte: {
-                    "$min": "$%s" % attribute
+        attrname = self.get_mongo_attribute_name(attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": "$item",
+                    "result": {
+                        "$min": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
                 }
             }
-        })
+        ])
 
-    def add_mongo_aggregation_avg(self, attribute, reference):
+    def add_mongo_aggregation_avg(self, stack, attribute, reference=None):
         """
         Transposes a stats average aggregation into a mongo query
 
@@ -879,14 +1052,48 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        stack.append({
-            "$group": {
-                "_id": "$item",
-                attrubte: {
-                    "$avg": "$%s" % attribute
+        attrname = self.get_mongo_attribute_name(attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$avg": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
                 }
             }
-        })
+        ])
+
+    def add_mongo_aggregation_count(self, stack, attribute=None, reference=None):
+        """
+        Transposes a stats count aggregation into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$sum": 1
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
+                }
+            }
+        ])
 
     operator_mapping = {
         "=":  add_mongo_filter_eq,
@@ -905,6 +1112,7 @@ class LiveStatusMongoQuery(object):
         "min":  add_mongo_aggregation_min,
         "max":  add_mongo_aggregation_max,
         "avg":  add_mongo_aggregation_avg,
+        "count":  add_mongo_aggregation_count,
     }
 
     def add_mongo_filter(self, stack, operator, attribute, reference):
@@ -918,12 +1126,6 @@ class LiveStatusMongoQuery(object):
 
         """
         # Map livestatus attribute `name` to the object's name
-        # For the table `hosts`, the attribute `name` becomes `host_name`
-        if attribute == "name":
-            attribute = "%s_name" % self.table.rstrip("s")
-        # Same operation, but for service description
-        if self.table == "services" and attribute == "description":
-            attribute = "service_description"
         fct = self.operator_mapping.get(operator)
         # Matches operators
         if fct:
@@ -980,6 +1182,8 @@ class LiveStatusMongoQuery(object):
         # Negates each element in the stack
         for i in range(len(stack)-count, len(stack)):
             statement = stack[i]
+            if isinstance(statement, list):
+                raise LiveStatusQueryError(452, 'Cannot negate aggregation stats')
             stack[i] = self.stack_mongo_filter_negate_statement(statement)
         if wrap is True:
             reversed_stack = list(stack[-count:])

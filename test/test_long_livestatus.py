@@ -30,10 +30,6 @@ import os
 import sys
 import time
 import random
-sys.path.extend([
-    os.path.expanduser("~/git/shinken-src/shinken"),
-    os.path.expanduser("~/git/shinken-src/shinken/test")
-    ])
 
 from shinken_test import unittest
 
@@ -396,7 +392,7 @@ OutputFormat: python
         expected_result = []
         self.execute_and_assert(query, expected_result)
 
-    def test_negate(self):
+    def _test_negate(self):
         expected_result = [['test_host_001', 'pending_001']]
         # List matches (case insensitive)
         query = """GET hosts
@@ -445,6 +441,115 @@ Negate:
 OutputFormat: python
 """
         self.execute_and_assert(query, negate_hosts_condition)
+
+    def test_stats(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
+        print svc1
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_15")
+        print svc2
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
+        print svc3
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_05")
+        print svc4
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_11")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_01")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_03")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.update_broker()
+        # 1993O, 3xW, 3xC, 1xU
+
+        query = """GET services
+Filter: contacts >= test_contact
+Stats: state != 9999
+Stats: state = 0
+Stats: state = 1
+Stats: state = 2
+Stats: state = 3
+OutputFormat: python"""
+
+        expected_result = [2000, 1993, 3, 3, 1]
+        self.execute_and_assert(query, expected_result)
+
+        query = """GET services
+Filter: contacts >= test_contact
+Filter: state > 0
+Stats: state = 1
+Stats: state = 2
+Stats: state = 3
+Stats: max state
+Stats: min state
+Stats: sum state
+Stats: avg state
+OutputFormat: python"""
+
+        def compare_stats_1(result):
+            self.assertEqual(result[:-1], [3, 3, 1, 3, 1, 12])
+            self.assertEqual("%.02f" % result[-1], "1.71")
+
+        self.execute_and_assert(query, compare_stats_1)
+
+        query = """GET services
+Filter: contacts >= test_contact
+Filter: state > 0
+Stats: state = 1
+Stats: state = 2
+Stats: state = 3
+StatsOr:3
+Stats: max_check_attempts = 3
+StatsAnd:2
+Stats: max state
+Stats: min state
+Stats: sum state
+Stats: avg state
+OutputFormat: python"""
+
+        def compare_stats_2(result):
+            self.assertEqual(result[:-1], [7, 3, 1, 12])
+            self.assertEqual("%.02f" % result[-1], "1.71")
+
+        self.execute_and_assert(query, compare_stats_2)
+
+        query = """GET services
+Filter: contacts >= test_contact
+Stats: state = 1
+Stats: state = 2
+Stats: state = 3
+StatsOr:3
+Stats: max_check_attempts = 3
+StatsAnd:2
+StatsNegate:
+OutputFormat: python"""
+
+        expected_result = [1993]
+        self.execute_and_assert(query, expected_result)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01
@@ -525,41 +630,6 @@ OutputFormat: python
         self.assert_(h_response == """1;1;0;2;2
 """)
 
-    def _test_stats(self):
-        self.print_header()
-        now = time.time()
-        objlist = []
-        for host in self.sched.hosts:
-            objlist.append([host, 0, 'UP'])
-        for service in self.sched.services:
-            objlist.append([service, 0, 'OK'])
-        self.scheduler_loop(1, objlist)
-        self.update_broker()
-        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
-        print svc1
-        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_15")
-        print svc2
-        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
-        print svc3
-        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_05")
-        print svc4
-        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_11")
-        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_01")
-        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_03")
-        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
-        self.update_broker()
-        # 1993O, 3xW, 3xC, 1xU
-
-        request = """GET services
-Filter: contacts >= test_contact
-Stats: state != 9999
-Stats: state = 0
-Stats: state = 1
-Stats: state = 2
-Stats: state = 3"""
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
-        print 'query_6_______________\n%s\n%s\n' % (request, response)
-        self.assertEqual('2000;1993;3;3;1\n', response )
 
 
     def _test_statsgroupby(self):
