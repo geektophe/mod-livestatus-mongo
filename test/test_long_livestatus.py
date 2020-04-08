@@ -48,7 +48,7 @@ sys.setcheckinterval(10000)
 class TestConfigBig(TestConfig):
     def setUp(self):
         start_setUp = time.time()
-        self.setup_with_file('etc/shinken_5r_100h_2000s.cfg')
+        self.setup_with_file('etc/shinken_5r_10h_200s.cfg')
         Comment.id = 1
         self.testid = str(os.getpid() + random.randint(1, 1000))
         self.init_livestatus()
@@ -442,7 +442,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, negate_hosts_condition)
 
-    def test_stats(self):
+    def _test_stats(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -452,17 +452,14 @@ OutputFormat: python
             objlist.append([service, 0, 'OK'])
         self.scheduler_loop(1, objlist)
         self.update_broker()
-        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
-        print svc1
-        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_15")
-        print svc2
-        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
-        print svc3
-        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_05")
-        print svc4
-        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_11")
-        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_01")
-        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_03")
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_001", "test_warning_19")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_003", "test_warning_03")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_000", "test_critical_03")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_critical_02")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_008", "test_critical_13")
+        pprint([[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
         self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
         self.update_broker()
         # 1993O, 3xW, 3xC, 1xU
@@ -476,7 +473,7 @@ Stats: state = 2
 Stats: state = 3
 OutputFormat: python"""
 
-        expected_result = [2000, 1993, 3, 3, 1]
+        expected_result = [200, 193, 3, 3, 1]
         self.execute_and_assert(query, expected_result)
 
         query = """GET services
@@ -529,18 +526,71 @@ StatsAnd:2
 StatsNegate:
 OutputFormat: python"""
 
-        expected_result = [1993]
+        expected_result = [193]
         self.execute_and_assert(query, expected_result)
 
 
+    def _test_limit(self):
+        """
+        Tests result count limitting
+        """
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name ~ test_host_00[0-9]
+OutputFormat: python
+"""
 
+        expected_length = 10
 
+        def assert_len(result):
+            self.assertEqual(len(result), expected_length)
 
+        self.execute_and_assert(query, assert_len)
 
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name ~ test_host_00[0-9]
+Limit: 5
+OutputFormat: python
+"""
 
+        expected_length = 5
 
+        def assert_len(result):
+            self.assertEqual(len(result), expected_length)
 
+        self.execute_and_assert(query, assert_len)
 
+    def test_authuser(self):
+        """
+        Tests limitting results what's authorized to authenticated user
+        """
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name ~ test_host_00[0-9]
+OutputFormat: python
+"""
+
+        def assert_no_authuser(result):
+            self.assertEqual(len(result), 10)
+            self.assertIn(['test_host_001', 'pending_001'], result)
+            self.assertIn(['test_host_009', 'up_009'], result)
+
+        self.execute_and_assert(query, assert_no_authuser)
+
+        query = """GET hosts
+Columns: host_name alias
+Filter: host_name ~ test_host_00[0-9]
+AuthUser: test_contact_02
+OutputFormat: python
+"""
+
+        def assert_authuser(result):
+            self.assertEqual(len(result), 1)
+            self.assertIn(['test_host_001', 'pending_001'], result)
+            self.assertNotIn(['test_host_009', 'up_009'], result)
+
+        self.execute_and_assert(query, assert_authuser)
 
 
 

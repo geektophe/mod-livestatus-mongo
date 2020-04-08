@@ -27,6 +27,7 @@ from shinken.util import safe_print
 from shinken.misc.sorter import hst_srv_sort, last_state_change_earlier
 from shinken.misc.filter import only_related_to
 from pprint import pprint
+import pymongo
 
 class DataManager(object):
     def __init__(self):
@@ -312,7 +313,7 @@ class DataManager(object):
                 {"$set": data}
             )
 
-    def find(self, table, query):
+    def find(self, table, query, limit=None):
         """
         General purpose MongoDB find() query
 
@@ -320,7 +321,17 @@ class DataManager(object):
         :return: The query result
         """
         collection = getattr(self.db, table)
-        return collection.find(query)
+        if limit is None:
+            return collection.find(query).sort(
+                "_id",
+                pymongo.ASCENDING
+            )
+        else:
+            return collection.find(query).limit(limit).sort(
+                "_id",
+                pymongo.ASCENDING
+            )
+
 
     def count(self, table, query):
         """

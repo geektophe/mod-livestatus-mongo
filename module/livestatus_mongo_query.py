@@ -223,9 +223,15 @@ class LiveStatusMongoQuery(object):
             elif keyword == 'Limit':
                 _, self.limit = self.split_option(line)
             elif keyword == 'AuthUser':
-                if self.table in ['hosts', 'hostgroups', 'services', 'servicegroups', 'hostsbygroup', 'servicesbygroup', 'servicesbyhostgroup']:
-                    _, self.authuser = self.split_option(line)
-                # else self.authuser stays None and will be ignored
+                _, authuser = self.split_option(line)
+                if self.table in ['hosts', 'services']:
+                    self.add_mongo_filter_user(
+                        self.mongo_filters,
+                        "contacts",
+                        authuser
+                    )
+                elif self.table in ['hostgroups', 'servicegroups', 'hostsbygroup', 'servicesbygroup', 'servicesbyhostgroup']:
+                    pass
             elif keyword == 'Filter':
                 try:
                     attribute, operator, reference = self.parse_filter_line(line)
@@ -385,7 +391,7 @@ class LiveStatusMongoQuery(object):
         print("Mongo filter query: table: %s" % self.table)
         query = self.get_mongo_filter_query()
         pprint(query)
-        return self.mongo_datamgr.find(self.table, query)
+        return self.mongo_datamgr.find(self.table, query, limit=self.limit)
 
     def execute_mongo_stats_query(self):
         """
@@ -697,7 +703,7 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        attribute = self.get_mongo_attribute_name(attribute)
+        attrname = self.get_mongo_attribute_name(attribute)
         attrtype = self.get_mongo_attribute_type(attribute)
         if attrtype is list:
             raise LiveStatusQueryError(452, 'operator not available for lists')
@@ -715,7 +721,7 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        attribute = self.get_mongo_attribute_name(attribute)
+        attrname = self.get_mongo_attribute_name(attribute)
         attrtype = self.get_mongo_attribute_type(attribute)
         # Builds regular expression
         reg = str(reference)
@@ -964,6 +970,21 @@ class LiveStatusMongoQuery(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
+        stack.append({})
+
+    def add_mongo_filter_user(self, stack, attribute, username):
+        """
+        Add a filter limitting the output to hosts/services having the
+        username as contact.
+
+        :param list stack: The stack to append filter to
+        :param str username: The username to limit output to
+        """
+        stack.append({
+            attribute: {
+                "$in": [str(username)]
+            }
+        })
         stack.append({})
 
     def add_mongo_aggregation_sum(self, stack, attribute, reference=None):
