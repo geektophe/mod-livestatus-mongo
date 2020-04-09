@@ -314,8 +314,6 @@ class LiveStatusMongoQuery(object):
 
     def process_query(self):
         result = self.launch_query()
-        print("* Result:")
-        pprint(result)
         self.response.format_live_data(result, self.columns, self.aliases)
         return self.response.respond()
 
@@ -391,7 +389,12 @@ class LiveStatusMongoQuery(object):
         print("Mongo filter query: table: %s" % self.table)
         query = self.get_mongo_filter_query()
         pprint(query)
-        return self.mongo_datamgr.find(self.table, query, limit=self.limit)
+        return self.mongo_datamgr.find(
+            self.table,
+            query,
+            self.columns,
+            self.limit
+        )
 
     def execute_mongo_stats_query(self):
         """
@@ -426,8 +429,6 @@ class LiveStatusMongoQuery(object):
         :rtype: list
         :return: The aggregation query
         """
-        print("* Stats query")
-        pprint(query)
         if isinstance(query, list):
             # The query is already an aggregation
             query.insert(0, {
@@ -985,7 +986,6 @@ class LiveStatusMongoQuery(object):
                 "$in": [str(username)]
             }
         })
-        stack.append({})
 
     def add_mongo_aggregation_sum(self, stack, attribute, reference=None):
         """
@@ -1226,7 +1226,6 @@ class LiveStatusMongoQuery(object):
         :rtype: dict
         :return: The negated statement
         """
-        print("Negate statement: %s" % statement)
         reversed_operators = {
             "$eq": "$ne",
             "$ne": "$eq",
@@ -1241,7 +1240,6 @@ class LiveStatusMongoQuery(object):
         }
         for attribute, comparator in list(statement.items()):
             if attribute in ("$and", "$or"):
-                print("Reversing $and or $or")
                 # Manages $and, $or, and other grouping statements
                 # Statement has pattern: {"$or": [...]} or {"$and": [...]}
                 # $or becomes $and and conversely
@@ -1277,5 +1275,4 @@ class LiveStatusMongoQuery(object):
                 statement[attribute] = {
                     "$not": statement[attribute]
                 }
-        print("Negate result: %s" % statement)
         return statement

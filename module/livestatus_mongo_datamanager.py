@@ -26,6 +26,7 @@
 from shinken.util import safe_print
 from shinken.misc.sorter import hst_srv_sort, last_state_change_earlier
 from shinken.misc.filter import only_related_to
+from mongo_mapping import table_class_map, find_filter_converter, list_livestatus_attributes, Problem
 from pprint import pprint
 import pymongo
 
@@ -284,8 +285,14 @@ class DataManager(object):
         :param Brok brok: The brok object to update object from
         """
         # Parses brok
-        if brok.data.get("host_name") == "test_host_005" and brok.data.get("service_description") == "test_ok_00":
-            pprint(brok.data)
+        if brok.data.get("host_name") == "test_host_005":
+            if "host" in brok.type:
+                print("Brok type: %s" % brok.type)
+                pprint(brok.data)
+            elif "service" in brok.type and \
+                    brok.data.get("service_description") == "test_ok_00":
+                print("Brok type: %s" % brok.type)
+                pprint(brok.data)
         data = {}
         for name, value in brok.data.items():
             if name == "dateranges":
@@ -302,36 +309,150 @@ class DataManager(object):
             )
         else:
             object_name = data["%s_name" % object_type]
+        data["_id"] = object_name
         collection = getattr(self.db, "%ss" % object_type)
-        count = collection.count({"_id": object_name})
-        if not count:
-            data["_id"] = object_name
-            collection.insert_one(data)
-        else:
-            collection.update(
-                {"_id": object_name},
-                {"$set": data}
-            )
+        collection.update(
+            {"_id": object_name},
+            {"$set": data},
+            upsert=True
+        )
 
-    def find(self, table, query, limit=None):
+    def get_mongo_column_filter(self, table, column):
         """
-        General purpose MongoDB find() query
+        Return the attribute name to use to query the mongo database.
+
+        Some attribute hold different names when requested through LQL, and
+        queried in mongo. Return the suitable attribute for Mongo query
+        from LQL.
+
+        :param str table: The table name
+        :param str column: The LQL requested column
+        :rtype: str
+        :return: The attribute name to use in mongo query
+        """
+        return table_class_map[table][column].get(
+            "filter", column
+        )
+
+    def get_mongo_column_projections(self, table, column):
+        """
+        Return the attribute projections for the given column
+
+        Some attribute hold different names when requested through LQL, and
+        queried in mongo. Return the suitable attribute for Mongo query
+        from LQL.
+
+        :param str table: The table name
+        :param str column: The LQL requested column
+        :rtype: str
+        :return: The attribute name to use in mongo query
+        """
+        projections = table_class_map[table][column].get(
+            "projections",
+            self.get_mongo_column_filter(table, column)
+        )
+        if isinstance(projections, list):
+            return projections
+        else:
+            return [projections]
+
+    def get_mongo_columns_projections(self, table, columns):
+        """
+        Generates the projection dictionnary from the table and requested
+        columns
+
+        :param str table: The table name
+        :param list columns: The requested columns
+        :rtype: dict
+        :return: The projection dictionnary
+        """
+        projections = ["_id"]
+        for column in columns:
+            projections.extend(
+                self.get_mongo_column_projections(table, column)
+            )
+        projections = list(set(projections))
+        return dict(
+            [(p, 1) for p in projections]
+        )
+
+    def get_mongo_aggregation_lookup_hosts(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        if not projections or any([p.startswith("services.") for p in projections]):
+            return {
+                "$lookup": {
+                    "from": "services",
+                    "localField": "host_name",
+                    "foreignField": "host_name",
+                    "as": "services",
+                }
+            }
+        else:
+            return None
+
+    def find(self, table, query, columns=None, limit=None):
+        """
+        Find hosts, and request cross collection documents when necessary
 
         :rtype: iterator
         :return: The query result
         """
         collection = getattr(self.db, table)
-        if limit is None:
-            return collection.find(query).sort(
+
+        # Build result projections to limit the data to return from the
+        # database
+        if columns is not None:
+            projections = self.get_mongo_columns_projections(table, columns)
+        else:
+            projections = []
+
+        # Check if another collection lookup is necessary
+        get_lookup_fct_name = "get_mongo_aggregation_lookup_%s" % table
+        get_lookup_fct = getattr(self, get_lookup_fct_name, None)
+
+        if get_lookup_fct:
+            lookup = get_lookup_fct(table, projections)
+        else:
+            lookup = None
+
+        # If another collection $lookup is necessary, use an aggregation
+        # rather than a search
+        if lookup:
+            pipeline = [
+                {"$match": query}
+            ]
+            if limit:
+                pipeline.append({"$limit": limit})
+            pipeline.append(lookup)
+            if projections:
+                pipeline.append({
+                    "$project": projections
+                })
+            pipeline.append(
+                {"$sort": {"_id": 1}}
+            )
+            print("find(): aggregation pipeline:")
+            pprint(pipeline)
+            cursor = collection.aggregate(pipeline)
+        elif limit is None:
+            cursor = collection.find(query, projections).sort(
                 "_id",
                 pymongo.ASCENDING
             )
         else:
-            return collection.find(query).limit(limit).sort(
+            cursor = collection.find(query, projections).limit(limit).sort(
                 "_id",
                 pymongo.ASCENDING
             )
-
+        return cursor
 
     def count(self, table, query):
         """

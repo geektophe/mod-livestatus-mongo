@@ -581,43 +581,53 @@ livestatus_attribute_map = {
         },
         'num_services': {
             'description': 'The total number of services of the host',
-            'function': lambda item: len(item.services),
+            'function': lambda item: len(item["services"]),
+            'projections': ['services.service_description'],
         },
         'num_services_crit': {
             'description': 'The number of the host\'s services with the soft state CRIT',
             'function': lambda item: len([x for x in item.services if x.state_id == 2]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_hard_crit': {
             'description': 'The number of the host\'s services with the hard state CRIT',
             'function': lambda item: len([x for x in item.services if x.state_id == 2 and x.state_type_id == 1]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_hard_ok': {
             'description': 'The number of the host\'s services with the hard state OK',
             'function': lambda item: len([x for x in item.services if x.state_id == 0 and x.state_type_id == 1]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_hard_unknown': {
             'description': 'The number of the host\'s services with the hard state UNKNOWN',
             'function': lambda item: len([x for x in item.services if x.state_id == 3 and x.state_type_id == 1]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_hard_warn': {
             'description': 'The number of the host\'s services with the hard state WARN',
             'function': lambda item: len([x for x in item.services if x.state_id == 1 and x.state_type_id == 1]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_ok': {
             'description': 'The number of the host\'s services with the soft state OK',
             'function': lambda item: len([x for x in item.services if x.state_id == 0]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_pending': {
             'description': 'The number of the host\'s services which have not been checked yet (pending)',
             'function': lambda item: len([x for x in item.services if x.has_been_checked == 0]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_unknown': {
             'description': 'The number of the host\'s services with the soft state UNKNOWN',
             'function': lambda item: len([x for x in item.services if x.state_id == 3]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'num_services_warn': {
             'description': 'The number of the host\'s services with the soft state WARN',
             'function': lambda item: len([x for x in item.services if x.state_id == 1]),
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'obsess_over_host': {
             'description': 'The current obsess_over_host setting... (0/1)',
@@ -685,17 +695,28 @@ livestatus_attribute_map = {
             'description': 'A list of all services of the host',
             'function': lambda item: item["services"],
             'datatype': list,
+            'projections': ['services.service_description']
         },
         'services_with_info': {
             'description': 'A list of all services including detailed information about each service',
             'function': lambda item: item["services_with_info"],  # REPAIRME
             'datatype': list,
+            'projections': [
+                'services.service_description',
+                'services.state_id',
+                'services.state_type_id'
+            ],
             # Dummy Service|0|1|Please remove this service later,Deppen Service|2|1|depp
         },
         'services_with_state': {
             'description': 'A list of all services of the host together with state and has_been_checked',
             'function': lambda item: [join_with_separators(req, x.get_name(), x.state_id, x.has_been_checked) for x in item.services],
             'datatype': list,
+            'projections': [
+                'services.service_description',
+                'services.state_id',
+                'services.state_type_id'
+            ],
         },
         'source_problems': {
             'description': 'The name of the source problems (host or service)',
@@ -732,11 +753,13 @@ livestatus_attribute_map = {
             'description': 'The worst hard state of all of the host\'s services (OK <= WARN <= UNKNOWN <= CRIT)',
             'function': lambda item: reduce(worst_service_state, (x.state_id for x in item.services if x.state_type_id == 1), 0),
             'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id']
         },
         'worst_service_state': {
             'description': 'The worst soft state of all of the host\'s services (OK <= WARN <= UNKNOWN <= CRIT)',
             'function': lambda item: reduce(worst_service_state, (x.state_id for x in item.services), 0),
             'datatype': int,
+            'projections': ['services.state_id']
         },
         'x_3d': {
             'description': '3D-Coordinates: X',
@@ -1559,22 +1582,27 @@ livestatus_attribute_map = {
         'num_hosts': {
             'description': 'The total number of hosts in the group',
             'function': lambda item: len(item.members),
+            'projections': ["hosts.host_name"],
         },
         'num_hosts_down': {
             'description': 'The number of hosts in the group that are down',
             'function': lambda item: len([x for x in item.members if x.state_id == 1]),
+            'projections': ["hosts.state_id"],
         },
         'num_hosts_pending': {
             'description': 'The number of hosts in the group that are pending',
             'function': lambda item: len([x for x in item.members if x.has_been_checked == 0]),
+            'projections': ["hosts.state_id"],
         },
         'num_hosts_unreach': {
             'description': 'The number of hosts in the group that are unreachable',
             'function': lambda item: len([x for x in item.members if x.state_id == 2]),
+            'projections': ["hosts.state_id"],
         },
         'num_hosts_up': {
             'description': 'The number of hosts in the group that are up',
             'function': lambda item: len([x for x in item.members if x.state_id == 0]),
+            'projections': ["hosts.state_id"],
         },
         'num_services': {
             'description': 'The total number of services of hosts in this group',

@@ -561,7 +561,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_len)
 
-    def test_authuser(self):
+    def _test_authuser(self):
         """
         Tests limitting results what's authorized to authenticated user
         """
@@ -592,10 +592,20 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_authuser)
 
+    def test_cross_collections_objects(self):
 
+        query = """GET hosts
+Columns: host_name num_services
+Filter: host_name ~ test_host_00[0-9]
+AuthUser: test_contact_02
+OutputFormat: python
+"""
 
+        def assert_dummy(result):
+            pass
 
-
+        expected_result = [[u'test_host_001', 20]]
+        self.execute_and_assert(query, expected_result)
 
 
 
