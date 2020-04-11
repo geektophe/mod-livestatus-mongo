@@ -27,8 +27,10 @@ from shinken.util import safe_print
 from shinken.misc.sorter import hst_srv_sort, last_state_change_earlier
 from shinken.misc.filter import only_related_to
 from mongo_mapping import table_class_map, find_filter_converter, list_livestatus_attributes, Problem
+from livestatus_query_error import LiveStatusQueryError
 from pprint import pprint
 import pymongo
+import re
 
 class DataManager(object):
     def __init__(self):
@@ -317,7 +319,13 @@ class DataManager(object):
             upsert=True
         )
 
-    def get_mongo_column_filter(self, table, column):
+    def make_stack(self):
+        """
+        Builds a stack to add filters to
+        """
+        return []
+
+    def get_mongo_attribute_name(self, table, attribute):
         """
         Return the attribute name to use to query the mongo database.
 
@@ -325,14 +333,616 @@ class DataManager(object):
         queried in mongo. Return the suitable attribute for Mongo query
         from LQL.
 
-        :param str table: The table name
-        :param str column: The LQL requested column
+        :param str table: The table the attribute is in
+        :param str attribute: The LQL requested attribute
         :rtype: str
         :return: The attribute name to use in mongo query
         """
-        return table_class_map[table][column].get(
-            "filter", column
-        )
+        mapping = table_class_map[table][attribute]
+        return mapping.get("filters", {}).get("attr", attribute)
+
+    def get_mongo_attribute_type(self, table, attribute):
+        """
+        Returns the attribute type, as shown in object mapping
+
+        :param str attribute: The LQL requested attribute
+        :param str table: The table the attribute is in
+        :rtype: type
+        :return: The attribute type
+        """
+        return table_class_map[table][attribute].get("datatype")
+
+    def add_filter_eq(self, stack, table, attribute, reference):
+        """
+        Transposes an equalitiy operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            stack.append({
+                attrname: []
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {
+                    "$eq": attrtype(reference)
+                }
+            })
+        else:
+            stack.append({
+                attrname: {
+                    "$eq": reference
+                }
+            })
+
+    def add_filter_eq_ci(self, stack, table, attribute, reference):
+        """
+        Transposes a case insensitive equalitiy operator filter into a mongo
+        query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            raise LiveStatusQueryError(452, 'operator not available for lists')
+        # Builds regular expression
+        reg = "^%s$" % reference
+        stack.append({
+            attrname: re.compile(reg, re.IGNORECASE)
+        })
+
+    def add_filter_reg(self, stack, table, attribute, reference):
+        """
+        Transposes a regex match operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
+            stack.append({
+                attrname: {
+                    "$in": [re.compile(reg)]
+                }
+            })
+        else:
+            stack.append({
+                attrname: re.compile(reg)
+            })
+
+    def add_filter_reg_ci(self, stack, table, attribute, reference):
+        """
+        Transposes a case insensitive regex match operator filter into a mongo
+        query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
+            stack.append({
+                attrname: {
+                    "$in": [
+                        re.compile(reg, re.IGNORECASE)
+                    ]
+                }
+            })
+        else:
+            stack.append({
+                attrname: re.compile(reg, re.IGNORECASE)
+            })
+
+    def add_filter_lt(self, stack, table, attribute, reference):
+        """
+        Transposes a lower than operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            stack.append({
+                attrname: {
+                    "$nin": [reference]
+                }
+            })
+        else:
+            stack.append({
+                attrname: {"$lt": reference}
+            })
+
+    def add_filter_le(self, stack, table, attribute, reference):
+        """
+        Transposes a lower than or equal operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            # Builds regular expression
+            reg = "^%s$" % reference
+            stack.append({
+                attrname: {
+                    "$in": [re.compile(reg, re.IGNORECASE)]
+                }
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$lte": attrtype(reference)}
+            })
+        else:
+            stack.append({
+                attrname: {"$lte": reference}
+            })
+
+    def add_filter_gt(self, stack, table, attribute, reference):
+        """
+        Transposes a lower than operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            # Builds regular expression
+            reg = "^%s$" % reference
+            stack.append({
+                attrname: {
+                    "$nin": [re.compile(reg, re.IGNORECASE)]
+                }
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$gt": attrtype(reference)}
+            })
+        else:
+            stack.append({
+                attrname: {"$gt": reference}
+            })
+
+    def add_filter_ge(self, stack, table, attribute, reference):
+        """
+        Transposes a greater than or equal operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            stack.append({
+                attrname: {"$in": [reference]}
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$gte": attrtype(reference)}
+            })
+        else:
+            stack.append({
+                attrname: {"$gte": reference}
+            })
+
+    def add_filter_not_eq(self, stack, table, attribute, reference):
+        """
+        Transposes a not equal  operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            stack.append({
+                attrname: {"$ne": []}
+            })
+        elif attrtype is not None:
+            stack.append({
+                attrname: {"$ne": attrtype(reference)}
+            })
+        else:
+            stack.append({
+                attrname: {"$ne": reference}
+            })
+
+    def add_filter_not_eq_ci(self, stack, table, attribute, reference):
+        """
+        Transposes a case insensitive not equal operator filter into a mongo
+        query
+
+        Before MongoDB version 4.0.7, $not does not support $regex
+        This, using bson.regex.Regex regular expressions is required
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        if attrtype is list:
+            raise LiveStatusQueryError(452, 'operator not available for lists')
+        # Builds regular expression
+        reg = "^%s$" % reference
+        stack.append({
+            attrname: {
+                "$not": re.compile(reg, re.IGNORECASE)
+            }
+        })
+
+    def add_filter_not_reg(self, stack, table, attribute, reference):
+        """
+        Transposes a regex not match operator filter into a mongo query
+
+        Before MongoDB version 4.0.7, $not does not support $regex
+        This, using bson.regex.Regex regular expressions is required
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
+            stack.append({
+                attrname: {
+                    "$nin": [re.compile(reg)]
+                }
+            })
+        else:
+            stack.append({
+                attrname: {"$not": re.compile(reg)}
+            })
+
+    def add_filter_not_reg_ci(self, stack, table, attribute, reference):
+        """
+        Transposes a case insensitive regex not match operator filter into a
+        mongo query
+
+        Before MongoDB version 4.0.7, $not does not support $regex
+        This, using bson.regex.Regex regular expressions is required
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        attrtype = self.get_mongo_attribute_type(table, attribute)
+        # Builds regular expression
+        reg = str(reference)
+        if attrtype is list:
+            stack.append({
+                attrname: {
+                    "$nin": [re.compile(reg, re.IGNORECASE)]
+                }
+            })
+        else:
+            stack.append({
+                attrname: {
+                    "$not": re.compile(reg, re.IGNORECASE)
+                }
+            })
+
+    def add_filter_dummy(self, stack, table, attribute, reference):
+        """
+        Transposes a dummy (always true) operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        stack.append({})
+
+    def add_filter_user(self, stack, attribute, username):
+        """
+        Add a filter limitting the output to hosts/services having the
+        username as contact.
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str username: The username to limit output to
+        """
+        stack.append({
+            attribute: {
+                "$in": [str(username)]
+            }
+        })
+
+    def add_aggregation_sum(self, stack, table, attribute, reference=None):
+        """
+        Transposes a stats sum aggregation into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$sum": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
+                }
+            }
+        ])
+
+    def add_aggregation_max(self, stack, table, attribute, reference=None):
+        """
+        Transposes a stats max aggregation into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$max": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
+                }
+            }
+        ])
+
+    def add_aggregation_min(self, stack, table, attribute, reference=None):
+        """
+        Transposes a stats min aggregation into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": "$item",
+                    "result": {
+                        "$min": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
+                }
+            }
+        ])
+
+    def add_aggregation_avg(self, stack, table, attribute, reference=None):
+        """
+        Transposes a stats average aggregation into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$avg": "$%s" % attrname
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
+                }
+            }
+        ])
+
+    def add_aggregation_count(self, stack, attribute=None, reference=None):
+        """
+        Transposes a stats count aggregation into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        stack.append([
+            {
+                "$group": {
+                    "_id": None,
+                    "result": {
+                        "$sum": 1
+                    }
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "result": 1
+                }
+            }
+        ])
+
+    def stack_filter_and(self, stack, table, count):
+        """
+        Stacks the last `count` operations into an `and` group
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param int count: The number of statements to stack
+        """
+        if len(stack) < count:
+            raise LiveStatusQueryError(452, 'No enough filters to stack into `and`')
+        and_filter = {
+            "$and": stack[-count:]
+        }
+        del stack[-count:]
+        stack.append(and_filter)
+
+    def stack_filter_or(self, stack, table, count):
+        """
+        Stacks the last `count` operations into an `or` group
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param int count: The number of statements to stack
+        """
+        if len(stack) < count:
+            raise LiveStatusQueryError(452, 'No enough filters to stack into `or`')
+        or_filter = {
+            "$or": stack[-count:]
+        }
+        del stack[-count:]
+        stack.append(or_filter)
+
+    def stack_filter_negate(self, stack, count, wrap=True):
+        """
+        Inverts the logic of the previous filters stack
+
+        As there's no global $not operator in MongoDB query ($not can only
+        be applied to an attribute), we're forced to negate by inverting
+        the query logic itself.
+
+        :param list stack: The stack to append filter to
+        :param int count: The number of statements to negate
+        :param bool wrap: Should the result be wrapped in an "$or"
+        """
+        if not count:
+            count = len(stack)
+        if len(stack) < count:
+            raise LiveStatusQueryError(452, 'No enough filters to stack into `negate`')
+        # Negates each element in the stack
+        for i in range(len(stack)-count, len(stack)):
+            statement = stack[i]
+            if isinstance(statement, list):
+                raise LiveStatusQueryError(452, 'Cannot negate aggregation stats')
+            stack[i] = self.stack_filter_negate_statement(statement)
+        if wrap is True:
+            reversed_stack = list(stack[-count:])
+            del stack[-count:]
+            stack.append({
+                "$or": reversed_stack
+            })
+        return stack
+
+    def stack_filter_negate_statement(self, statement):
+        """
+        Inverts the logic of a single statement
+
+        As there's no global $not operator in MongoDB query ($not can only
+        be applied to an attribute), we're forced to negate by inverting
+        the query logic itself.
+
+        :param dict statement: The statement to negate
+        :rtype: dict
+        :return: The negated statement
+        """
+        reversed_operators = {
+            "$eq": "$ne",
+            "$ne": "$eq",
+            "$gt": "$le",
+            "$le": "$gt",
+            "$ge": "$lt",
+            "$lt": "$ge",
+            "$in": "$nin",
+            "$nin": "$in",
+            "$or": "$and",
+            "$and": "$or",
+        }
+        for attribute, comparator in list(statement.items()):
+            if attribute in ("$and", "$or"):
+                # Manages $and, $or, and other grouping statements
+                # Statement has pattern: {"$or": [...]} or {"$and": [...]}
+                # $or becomes $and and conversely
+                reversed_operator = reversed_operators[attribute]
+                stack = list(statement[attribute])
+                # There can't both $and or $or with another operartor
+                # Returning the value directly
+                return {
+                    reversed_operator: self.stack_filter_negate(
+                        stack=stack,
+                        count=len(stack),
+                        wrap=False
+                    )
+                }
+            # Statement has pattern: {field: comparator}
+            if isinstance(comparator, dict):
+                # Statement has pattern: {field: {"$eq": value}}
+                # {"$eq": value} becomes {"$ne": value} and so on...
+                for operator, value in list(comparator.items()):
+                    if operator == "$not":
+                        # Statement has pattern: {field: {"$not": value}}
+                        # {field: {"$not": value}} becomes {field: value}
+                        statement[attribute] = value
+                        break
+                    if operator not in reversed_operators:
+                        raise LiveStatusQueryError(452, 'Cannot negate statement %s' % statement)
+                    reversed_operator = reversed_operators[operator]
+                    del comparator[operator]
+                    comparator[reversed_operator] = value
+            else:
+                # Statement has pattern: {field: value}
+                # {field: value} becomes {field: {"$not": value}}
+                statement[attribute] = {
+                    "$not": statement[attribute]
+                }
+        return statement
 
     def get_mongo_column_projections(self, table, column):
         """
@@ -347,9 +957,10 @@ class DataManager(object):
         :rtype: str
         :return: The attribute name to use in mongo query
         """
-        projections = table_class_map[table][column].get(
+        mapping = table_class_map[table][column]
+        projections = mapping.get(
             "projections",
-            self.get_mongo_column_filter(table, column)
+            self.get_mongo_attribute_name(table, column)
         )
         if isinstance(projections, list):
             return projections
@@ -397,6 +1008,63 @@ class DataManager(object):
             }
         else:
             return None
+
+    def get_filter_query(self, table, stack):
+        """
+        Generates the final filter query from the list of queries in
+        mongo_filters
+
+        :param list stack: The stack to append filter to
+        :rtype: dict
+        :return: The filter query
+        """
+        if stack:
+            if len(stack) > 1:
+                query = {"$and": stack}
+            else:
+                query = stack[0]
+        else:
+            query = {}
+        return query
+
+    def get_aggregation_query(self, table, filter_query, query):
+        """
+        Generates the final aggregation query from the list of queries in
+        mongo_stats_filters
+
+        :param str table: The table name
+        :param dict filter_query: The initial filter query limitting the
+                                  aggregation scope
+        :param list,dict query: The aggregation/stats query
+        :rtype: list
+        :return: The aggregation query
+        """
+        if isinstance(query, list):
+            # The query is already an aggregation
+            query.insert(0, {
+                "$match": filter_query
+            })
+        else:
+            # The query is a stat filter, and needs to be enclosed in a count
+            # aggregation
+            stack = []
+            self.add_aggregation_count(stack)
+            aggregation_query = stack.pop()
+            if filter_query:
+                aggregation_query.insert(0, {
+                    "$match": {
+                        "$and": [
+                            filter_query,
+                            query
+                        ]
+                    }
+                })
+            else:
+                aggregation_query.insert(0, {
+                    "$match": query
+                })
+            query = aggregation_query
+        return query
 
     def find(self, table, query, columns=None, limit=None):
         """

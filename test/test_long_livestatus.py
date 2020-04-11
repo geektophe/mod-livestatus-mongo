@@ -87,7 +87,7 @@ class TestConfigBig(TestConfig):
         else:
             self.assertEqual(pyresponse, expected_result)
 
-    def _test_simple_query(self):
+    def test_simple_query(self):
         """
         Tests a simple query execution
         """
@@ -322,7 +322,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
-    def _test_nested_and_or_query(self):
+    def test_nested_and_or_query(self):
         """
         Tests a simple query execution
         """
@@ -392,7 +392,7 @@ OutputFormat: python
         expected_result = []
         self.execute_and_assert(query, expected_result)
 
-    def _test_negate(self):
+    def test_negate(self):
         expected_result = [['test_host_001', 'pending_001']]
         # List matches (case insensitive)
         query = """GET hosts
@@ -442,7 +442,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, negate_hosts_condition)
 
-    def _test_stats(self):
+    def test_stats(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -530,7 +530,7 @@ OutputFormat: python"""
         self.execute_and_assert(query, expected_result)
 
 
-    def _test_limit(self):
+    def test_limit(self):
         """
         Tests result count limitting
         """
@@ -561,7 +561,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_len)
 
-    def _test_authuser(self):
+    def test_authuser(self):
         """
         Tests limitting results what's authorized to authenticated user
         """
@@ -593,6 +593,19 @@ OutputFormat: python
         self.execute_and_assert(query, assert_authuser)
 
     def test_cross_collections_objects(self):
+
+        query = """GET hosts
+Columns: host_name num_services
+Filter: host_name ~ test_host_00[0-9]
+AuthUser: test_contact_02
+OutputFormat: python
+"""
+
+        def assert_dummy(result):
+            pass
+
+        expected_result = [[u'test_host_001', 20]]
+        self.execute_and_assert(query, expected_result)
 
         query = """GET hosts
 Columns: host_name num_services
