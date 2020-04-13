@@ -26,6 +26,7 @@
 from types import GeneratorType
 from collections import namedtuple
 from mongo_mapping import table_class_map
+from pprint import pprint
 
 import csv
 import json
@@ -221,6 +222,8 @@ class LiveStatusMongoResponse:
             rows.append(headers)
 
         for item in result:
+            print("format_live_data_items()")
+            pprint(item)
             row = []
             print("Columns: %s" % columns)
             for column in columns:

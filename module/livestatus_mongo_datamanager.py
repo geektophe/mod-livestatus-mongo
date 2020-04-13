@@ -325,7 +325,7 @@ class DataManager(object):
         """
         return []
 
-    def get_mongo_attribute_name(self, table, attribute):
+    def get_mongo_attribute_name(self, table, attribute, raise_error=True):
         """
         Return the attribute name to use to query the mongo database.
 
@@ -335,10 +335,16 @@ class DataManager(object):
 
         :param str table: The table the attribute is in
         :param str attribute: The LQL requested attribute
+        :param bool raise_error: A flag indicating if an error should be risen
+                                 when an attribute is not usable as filter
         :rtype: str
         :return: The attribute name to use in mongo query
         """
         mapping = table_class_map[table][attribute]
+        # Special case, if mapping is {}, no filtering is supported on this
+        # attribute
+        if "filters" in mapping and mapping["filters"] == {} and raise_error:
+            raise LiveStatusQueryError(452, "can't filter on attribute %s" % attribute)
         return mapping.get("filters", {}).get("attr", attribute)
 
     def get_mongo_attribute_type(self, table, attribute):
@@ -960,7 +966,7 @@ class DataManager(object):
         mapping = table_class_map[table][column]
         projections = mapping.get(
             "projections",
-            self.get_mongo_attribute_name(table, column)
+            self.get_mongo_attribute_name(table, column, False)
         )
         if isinstance(projections, list):
             return projections
@@ -1004,6 +1010,28 @@ class DataManager(object):
                     "localField": "host_name",
                     "foreignField": "host_name",
                     "as": "services",
+                }
+            }
+        else:
+            return None
+
+    def get_mongo_aggregation_lookup_services(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        if not projections or any([p.startswith("host.") for p in projections]):
+            return {
+                "$lookup": {
+                    "from": "hosts",
+                    "localField": "host_name",
+                    "foreignField": "host_name",
+                    "as": "host",
                 }
             }
         else:

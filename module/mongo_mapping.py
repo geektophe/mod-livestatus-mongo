@@ -28,29 +28,9 @@ import re
 from shinken.bin import VERSION
 from shinken.macroresolver import MacroResolver
 from shinken.util import get_customs_keys, get_customs_values
-#from shinken.objects.host import Host
-#from shinken.objects.hostgroup import Hostgroup
-#from shinken.objects.service import Service
-#from shinken.objects.servicegroup import Servicegroup
-#from shinken.objects.contact import Contact
-#from shinken.objects.contactgroup import Contactgroup
-#from shinken.objects.timeperiod import Timeperiod
-#from shinken.objects.command import Command
-#from shinken.objects.config import Config
-#from shinken.downtime import Downtime
-#from shinken.comment import Comment
-
-# TODO : in some later version, change those import to new package path of these XxxLink classes:
- # from shinken.objects.schedulerlink import SchedulerLink
-#from shinken.schedulerlink import SchedulerLink
-#from shinken.reactionnerlink import ReactionnerLink
-#from shinken.brokerlink import BrokerLink
-#from shinken.receiverlink import ReceiverLink
-#from shinken.pollerlink import PollerLink
-
 from shinken.log import logger
-#from log_line import LOGCLASS_INFO, LOGCLASS_ALERT, LOGCLASS_PROGRAM, LOGCLASS_NOTIFICATION, LOGCLASS_PASSIVECHECK, LOGCLASS_COMMAND, LOGCLASS_STATE, LOGCLASS_INVALID, LOGCLASS_ALL, LOGOBJECT_INFO, LOGOBJECT_HOST, LOGOBJECT_SERVICE, LOGOBJECT_CONTACT, Logline, LoglineWrongFormat
 from shinken.misc.common import DICT_MODATTR
+from pprint import pprint
 
 class Problem:
     def __init__(self, source, impacts):
@@ -155,6 +135,86 @@ def get_livestatus_full_name(item, req):
         else:
             return item.host_name
         pass
+
+
+def state_count(item, table, state_type_id=None, state_id=None):
+    """
+    Returns the number of services having state_type_id and state_id matching
+    the input parameters.
+
+    :param dict item: The item to get services for
+    :param int state_type_id: The service state type id (0/1)
+    :param int/str item: The service state id (0, 1, 2, or OK, WARN, CRIT,
+                         UNKNOWN, PENDING)
+    :rtype: int
+    :return: The number of matching services
+    """
+    try:
+        if state_type_id is not None and state_id is not None:
+            if isinstance(state_id, int):
+                return len([
+                    s for s in item[table]
+                    if s["state_type_id"] == state_type_id
+                    and s["state_id"] == state_id
+                ])
+            else:
+                return len([
+                    s for s in item[table]
+                    if s["state_type_id"] == state_type_id
+                    and s["state"] == state
+                ])
+        elif state_type_id is not None:
+            return len([
+                s for s in item[table] if s["state_type_id"] == state_id
+            ])
+        elif state_id is not None:
+            if isinstance(state_id, int):
+                return len([
+                    s for s in item[table] if s["state_id"] == state_id
+                ])
+            else:
+                return len([
+                    s for s in item[table] if s["state"] == state_id
+                ])
+        else:
+            return len(item[table])
+    except:
+        print("state_count():")
+        pprint(item)
+        raise
+
+
+def state_worst(item, table, state_type_id=None):
+    """
+    Returns the worst state across  services having state_type_id and state_id
+    matching the input parameters.
+
+    :param str table: The table to for states
+    :param dict item: The item to get services for
+    :param int state_type_id: The service state type id (0/1)
+    :rtype: int
+    :return: The worst service state id
+    """
+    try:
+        if state_type_id is not None:
+            states = [
+                s["state_id"] for s in item[table]
+                if s["state_type_id"] == state_type_id
+            ]
+        else:
+            states = [
+                s["state_id"] for s in item[table]
+            ]
+        if 2 in states:
+            return 2
+        elif not states:
+            return 0
+        else:
+            return max(states)
+    except:
+        print("state_worst():")
+        pprint(item)
+        raise
 
 # description (optional): no need to explain this
 # prop (optional): the property of the object. If this is missing, the key is the property
@@ -275,17 +335,17 @@ livestatus_attribute_map = {
         },
         'comments': {
             'description': 'A list of the ids of all comments of this host',
-            'function': lambda item: [x.id for x in item.comments],
+            'function': lambda item: [], #FIXME
             'datatype': list,
         },
         'comments_with_info': {
             'description': 'A list of the ids of all comments of this host with id, author and comment',
-            'function': lambda item: [join_with_separators(req, str(x.id), x.author, x.comment) for x in item.comments],  # REPAIRME MAYBE
+            'function': lambda item: [],  #FIXME
             'datatype': list,
         },
         'contacts': {
             'description': 'A list of all contacts of this host, either direct or via a contact group',
-            'function': lambda item: [x.contact_name for x in item.contacts],
+            'function': lambda item: item["contacts"],
             'datatype': list,
         },
         'contact_groups': {
@@ -369,7 +429,7 @@ livestatus_attribute_map = {
         },
         'filename': {
             'description': 'The value of the custom variable FILENAME',
-            'function': lambda item: '',  # REPAIRME
+            'function': lambda item: '', #FIXME
             'datatype': str,
             'projections': [],
             'filters': {},
@@ -486,7 +546,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last check (Unix timestamp)',
             'function': lambda item: int(item["last_chk"]),
             'datatype': int,
-            'projections': ['last_chk'],
             'filters': {
                 'attr': 'last_chk',
             },
@@ -495,7 +554,6 @@ livestatus_attribute_map = {
             'description': 'Last hard state',
             'function': lambda item: item["last_hard_state_id"],
             'datatype': int,
-            'projections': ['last_hard_state_id'],
             'filters': {
                 'attr': 'last_hard_state_id',
             },
@@ -565,7 +623,7 @@ livestatus_attribute_map = {
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: modified_attributes_names(item),  # CONTROLME
+            'function': lambda item: [],  #FIXME
             'datatype': list,
         },
         'name': {
@@ -631,75 +689,6 @@ livestatus_attribute_map = {
             'description': 'Whether to stop sending notifications (0/1)',
             'function': lambda item: item["no_more_notifications"],  # REPAIRME, maybe ask both instance and class
             'datatype': bool,
-        },
-        'num_services': {
-            'description': 'The total number of services of the host',
-            'function': lambda item: len(item["services"]),
-            'projections': ['services.service_description'],
-            'filters': {},
-        },
-        'num_services_crit': {
-            'description': 'The number of the host\'s services with the soft state CRIT',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_hard_crit': {
-            'description': 'The number of the host\'s services with the hard state CRIT',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_hard_ok': {
-            'description': 'The number of the host\'s services with the hard state OK',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_hard_unknown': {
-            'description': 'The number of the host\'s services with the hard state UNKNOWN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_hard_warn': {
-            'description': 'The number of the host\'s services with the hard state WARN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_ok': {
-            'description': 'The number of the host\'s services with the soft state OK',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_pending': {
-            'description': 'The number of the host\'s services which have not been checked yet (pending)',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_unknown': {
-            'description': 'The number of the host\'s services with the soft state UNKNOWN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'num_services_warn': {
-            'description': 'The number of the host\'s services with the soft state WARN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
         },
         'obsess_over_host': {
             'description': 'The current obsess_over_host setting... (0/1)',
@@ -808,7 +797,6 @@ livestatus_attribute_map = {
             'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
             'function': lambda item: item["state_id"],
             'datatype': int,
-            'projections': ['state_id'],
             'filters': {
                 'attr': 'state_id',
             },
@@ -817,7 +805,6 @@ livestatus_attribute_map = {
             'description': 'Type of the current state (0: soft, 1: hard)',
             'function': lambda item: item["state_type_id"],
             'datatype': int,
-            'projections': ['state_type_id'],
             'filters': {
                 'attr': 'state_type_id',
             },
@@ -833,23 +820,9 @@ livestatus_attribute_map = {
         },
         'total_services': {
             'description': 'The total number of services of the host',
-            'function': lambda item: 0,  #FIXME
+            'function': lambda item: len(item["services"]),
             'datatype': int,
-            'projections': [],
-            'filters': {},
-        },
-        'worst_service_hard_state': {
-            'description': 'The worst hard state of all of the host\'s services (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0,  #FIXME
-            'datatype': int,
-            'projections': ['services.state_id', 'services.state_type_id'],
-            'filters': {},
-        },
-        'worst_service_state': {
-            'description': 'The worst soft state of all of the host\'s services (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0,  #FIXME
-            'datatype': int,
-            'projections': ['services.state_id'],
+            'projections': ['services.service_description'],
             'filters': {},
         },
         'x_3d': {
@@ -873,7 +846,6 @@ livestatus_attribute_map = {
             'description': 'Whether passive host checks are accepted (0/1)',
             'function': lambda item: item["host"]["problem_has_been_acknowledged"],
             'datatype': bool,
-            'projections': ['host.passive_checks_enabled'],
             'filters': {
                 'attr': 'host.passive_checks_enabled',
             },
@@ -882,7 +854,6 @@ livestatus_attribute_map = {
             'description': 'Whether the current host problem has been acknowledged (0/1)',
             'function': lambda item: item["host"]["problem_has_been_acknowledged"],
             'datatype': bool,
-            'projections': ['host.problem_has_been_acknowledged'],
             'filters': {
                 'attr': 'host.problem_has_been_acknowledged',
             },
@@ -891,7 +862,6 @@ livestatus_attribute_map = {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
             'function': lambda item: item["host"]["acknowledgement_type"],
             'datatype': int,
-            'projections': ['host.acknowledgement_type'],
             'filters': {
                 'attr': 'host.acknowledgement_type',
             },
@@ -899,7 +869,6 @@ livestatus_attribute_map = {
         'host_action_url': {
             'description': 'An optional URL to custom actions or information about this host',
             'function': lambda item: item["host"]["action_url"],
-            'projections': ['host.action_url'],
             'filters': {
                 'attr': 'host.action_url',
             },
@@ -913,7 +882,6 @@ livestatus_attribute_map = {
         'host_active_checks_enabled': {
             'description': 'Whether active checks are enabled for the host (0/1)',
             'function': lambda item: item["host"]["active_checks_enabled"],
-            'projections': ['host.active_checks_enabled'],
             'filters': {
                 'attr': 'host.active_checks_enabled',
             },
@@ -921,7 +889,6 @@ livestatus_attribute_map = {
         'host_address': {
             'description': 'IP address',
             'function': lambda item: item["host"]["address"],
-            'projections': ['host.address'],
             'filters': {
                 'attr': 'host.address',
             },
@@ -929,7 +896,6 @@ livestatus_attribute_map = {
         'host_alias': {
             'description': 'An alias name for the host',
             'function': lambda item: item["host"]["alias"],
-            'projections': ['host.alias'],
             'filters': {
                 'attr': 'host.alias',
             },
@@ -937,7 +903,6 @@ livestatus_attribute_map = {
         'host_check_command': {
             'description': 'Nagios command used for active checks',
             'function': lambda item: item["host"]["check_command"],
-            'projections': ['host.check_command'],
             'filters': {
                 'attr': 'host.check_command',
             },
@@ -946,7 +911,6 @@ livestatus_attribute_map = {
             'description': 'Whether to check to send a recovery notification when flapping stops (0/1)',
             'function': lambda item: item["host"]["check_flapping_recovery_notification"],
             'datatype': int,
-            'projections': ['host.check_flapping_recovery_notification'],
             'filters': {
                 'attr': 'host.check_flapping_recovery_notification',
             },
@@ -955,7 +919,6 @@ livestatus_attribute_map = {
             'description': 'Whether freshness checks are activated (0/1)',
             'function': lambda item: item["host"]["check_freshness"],
             'datatype': bool,
-            'projections': ['host.check_freshness'],
             'filters': {
                 'attr': 'host.check_freshness',
             },
@@ -964,7 +927,6 @@ livestatus_attribute_map = {
             'description': 'Number of basic interval lengths between two scheduled checks of the host',
             'function': lambda item: item["host"]["check_interval"],
             'datatype': float,
-            'projections': ['host.check_interval'],
             'filters': {
                 'attr': 'host.check_interval',
             },
@@ -972,7 +934,6 @@ livestatus_attribute_map = {
         'host_check_options': {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
             'function': lambda item: item["host"]["alias"],
-            'projections': ['host.alias'],
             'filters': {
                 'attr': 'host.alias',
             },
@@ -980,7 +941,6 @@ livestatus_attribute_map = {
         'host_check_period': {
             'description': 'Time period in which this host will be checked. If empty then the host will always be checked.',
             'function': lambda item: item["host"]["alias"],
-            'projections': ['host.alias'],
             'filters': {
                 'attr': 'host.alias',
             },
@@ -996,7 +956,6 @@ livestatus_attribute_map = {
             'description': 'Whether active checks of the host are enabled (0/1)',
             'function': lambda item: item["host"]["checks_enabled"],
             'datatype': bool,
-            'projections': ['host.checks_enabled'],
             'filters': {
                 'attr': 'host.checks_enabled',
             },
@@ -1012,7 +971,6 @@ livestatus_attribute_map = {
             'description': 'A list of the ids of all comments of this host',
             'function': lambda item: item["host"]["comments"],
             'datatype': list,
-            'projections': ['host.comments'],
             'filters': {
                 'attr': 'host.comments',
             },
@@ -1028,7 +986,6 @@ livestatus_attribute_map = {
             'description': 'A list of all contacts of this host, either direct or via a contact group',
             'function': lambda item: item["host"]["contacts"],
             'datatype': list,
-            'projections': ['host.contacts'],
             'filters': {
                 'attr': 'host.contacts',
             },
@@ -1037,7 +994,6 @@ livestatus_attribute_map = {
             'description': 'A list of all contact groups this host is in',
             'function': lambda item: item["host"]["contact_groups"],
             'datatype': list,
-            'projections': ['host.contact_groups'],
             'filters': {
                 'attr': 'host.contact_groups',
             },
@@ -1046,7 +1002,6 @@ livestatus_attribute_map = {
             'description': 'Number of the current check attempts',
             'function': lambda item: item["host"]["attempt"],
             'datatype': int,
-            'projections': ['host.attempt'],
             'filters': {
                 'attr': 'host.attempt',
             },
@@ -1055,7 +1010,6 @@ livestatus_attribute_map = {
             'description': 'Number of the current notification',
             'function': lambda item: item["host"]["current_notification_number"],
             'datatype': int,
-            'projections': ['host.current_notification_number'],
             'filters': {
                 'attr': 'host.current_notification_number',
             },
@@ -1084,7 +1038,6 @@ livestatus_attribute_map = {
         'host_display_name': {
             'description': 'Optional display name of the host - not used by Nagios\' web interface',
             'function': lambda item: item["host"]["display_name"],
-            'projections': ['host.display_name'],
             'filters': {
                 'attr': 'host.display_name',
             },
@@ -1107,7 +1060,6 @@ livestatus_attribute_map = {
         'host_event_handler': {
             'description': 'Nagios command used as event handler of this host',
             'function': lambda item: item["host"]["event_handler"],
-            'projections': ['host.event_handler'],
             'filters': {
                 'attr': 'host.event_handler',
             },
@@ -1116,7 +1068,6 @@ livestatus_attribute_map = {
             'description': 'Whether event handling is enabled for the host (0/1)',
             'function': lambda item: item["host"]["event_handler_enabled"],
             'datatype': bool,
-            'projections': ['host.event_handler_enabled'],
             'filters': {
                 'attr': 'host.event_handler_enabled',
             },
@@ -1125,7 +1076,6 @@ livestatus_attribute_map = {
             'description': 'Time the host check needed for execution',
             'function': lambda item: item["host"]["execution_time"],
             'datatype': float,
-            'projections': ['host.execution_time'],
             'filters': {
                 'attr': 'host.execution_time',
             },
@@ -1140,7 +1090,6 @@ livestatus_attribute_map = {
             'description': 'Delay before the first notification',
             'function': lambda item: item["host"]["first_notification_delay"],
             'datatype': float,
-            'projections': ['host.first_notification_delay'],
             'filters': {
                 'attr': 'host.first_notification_delay',
             },
@@ -1149,7 +1098,6 @@ livestatus_attribute_map = {
             'description': 'Whether flap detection is enabled (0/1)',
             'function': lambda item: item["host"]["flap_detection_enabled"],
             'datatype': bool,
-            'projections': ['host.flap_detection_enabled'],
             'filters': {
                 'attr': 'host.flap_detection_enabled',
             },
@@ -1158,7 +1106,6 @@ livestatus_attribute_map = {
             'description': 'A list of all host groups this host is in',
             'function': lambda item: item["host"]["hostgroups"],
             'datatype': list,
-            'projections': ['host.hostgroups'],
             'filters': {
                 'attr': 'host.hostgroups',
             },
@@ -1167,7 +1114,6 @@ livestatus_attribute_map = {
             'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
             'function': lambda item: item["host"]["hard_state"],
             'datatype': int,
-            'projections': ['host.hard_state'],
             'filters': {
                 'attr': 'host.hard_state',
             },
@@ -1176,7 +1122,6 @@ livestatus_attribute_map = {
             'description': 'Whether the host has already been checked (0/1)',
             'function': lambda item: item["host"]["has_been_checked"],
             'datatype': bool,
-            'projections': ['host.has_been_checked'],
             'filters': {
                 'attr': 'host.has_been_checked',
             },
@@ -1185,7 +1130,6 @@ livestatus_attribute_map = {
             'description': 'High threshold of flap detection',
             'function': lambda item: item["host"]["high_flap_threshold"],
             'datatype': float,
-            'projections': ['host.high_flap_threshold'],
             'filters': {
                 'attr': 'host.high_flap_threshold',
             },
@@ -1193,7 +1137,6 @@ livestatus_attribute_map = {
         'host_icon_image': {
             'description': 'The name of an image file to be used in the web pages',
             'function': lambda item: item["host"]["icon_image"],
-            'projections': ['host.icon_image'],
             'filters': {
                 'attr': 'host.icon_image',
             },
@@ -1201,7 +1144,6 @@ livestatus_attribute_map = {
         'host_icon_image_alt': {
             'description': 'Alternative text for the icon_image',
             'function': lambda item: item["host"]["icon_image_alt"],
-            'projections': ['host.icon_image_alt'],
             'filters': {
                 'attr': 'host.icon_image_alt',
             },
@@ -1230,7 +1172,6 @@ livestatus_attribute_map = {
             'description': 'Initial host state',
             'function': lambda item: item["host"]["initial_state"],
             'datatype': int,
-            'projections': ['host.initial_state'],
             'filters': {
                 'attr': 'host.initial_state',
             },
@@ -1245,7 +1186,6 @@ livestatus_attribute_map = {
             'description': 'Whether the host state is flapping (0/1)',
             'function': lambda item: item["host"]["is_flapping"],
             'datatype': bool,
-            'projections': ['host.is_flapping'],
             'filters': {
                 'attr': 'host.is_flapping',
             },
@@ -1254,7 +1194,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last check (Unix timestamp)',
             'function': lambda item: item["host"]["last_chk"],
             'datatype': int,
-            'projections': ['host.last_chk'],
             'filters': {
                 'attr': 'host.last_chk',
             },
@@ -1263,7 +1202,6 @@ livestatus_attribute_map = {
             'description': 'Last hard state',
             'function': lambda item: item["host"]["last_hard_state_id"],
             'datatype': int,
-            'projections': ['host.last_hard_state_id'],
             'filters': {
                 'attr': 'host.last_hard_state_id',
             },
@@ -1272,7 +1210,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last hard state change (Unix timestamp)',
             'function': lambda item: item["host"]["last_hard_state_change"],
             'datatype': int,
-            'projections': ['host.last_hard_state_change'],
             'filters': {
                 'attr': 'host.last_hard_state_change',
             },
@@ -1281,7 +1218,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last notification (Unix timestamp)',
             'function': lambda item: item["host"]["last_notification"],
             'datatype': int,
-            'projections': ['host.last_notification'],
             'filters': {
                 'attr': 'host.last_notification',
             },
@@ -1290,7 +1226,6 @@ livestatus_attribute_map = {
             'description': 'State before last state change',
             'function': lambda item: item["host"]["last_state"],
             'datatype': int,
-            'projections': ['host.last_state'],
             'filters': {
                 'attr': 'host.last_state',
             },
@@ -1299,7 +1234,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
             'function': lambda item: item["host"]["last_state_change"],
             'datatype': int,
-            'projections': ['host.last_state_change'],
             'filters': {
                 'attr': 'host.last_state_change',
             },
@@ -1308,7 +1242,6 @@ livestatus_attribute_map = {
             'description': 'The last time the host was DOWN (Unix timestamp)',
             'function': lambda item: item["host"]["last_time_down"],
             'datatype': int,
-            'projections': ['host.last_time_down'],
             'filters': {
                 'attr': 'host.last_time_down',
             },
@@ -1317,7 +1250,6 @@ livestatus_attribute_map = {
             'description': 'The last time the host was UNREACHABLE (Unix timestamp)',
             'function': lambda item: item["host"]["last_time_unreachable"],
             'datatype': int,
-            'projections': ['host.last_time_unreachable'],
             'filters': {
                 'attr': 'host.last_time_unreachable',
             },
@@ -1326,7 +1258,6 @@ livestatus_attribute_map = {
             'description': 'The last time the host was UP (Unix timestamp)',
             'function': lambda item: item["host"]["last_time_up"],
             'datatype': int,
-            'projections': ['host.last_time_up'],
             'filters': {
                 'attr': 'host.last_time_up',
             },
@@ -1335,7 +1266,6 @@ livestatus_attribute_map = {
             'description': 'Time difference between scheduled check time and actual check time',
             'function': lambda item: item["host"]["latency"],
             'datatype': float,
-            'projections': ['host.latency'],
             'filters': {
                 'attr': 'host.latency',
             },
@@ -1343,7 +1273,6 @@ livestatus_attribute_map = {
         'host_long_plugin_output': {
             'description': 'Complete output from check plugin',
             'function': lambda item: item["host"]["long_output"],
-            'projections': ['host.long_output'],
             'filters': {
                 'attr': 'host.long_output',
             },
@@ -1352,7 +1281,6 @@ livestatus_attribute_map = {
             'description': 'Low threshold of flap detection',
             'function': lambda item: item["host"]["low_flap_threshold"],
             'datatype': float,
-            'projections': ['host.low_flap_threshold'],
             'filters': {
                 'attr': 'host.low_flap_threshold',
             },
@@ -1361,7 +1289,6 @@ livestatus_attribute_map = {
             'description': 'Max check attempts for active host checks',
             'function': lambda item: item["host"]["max_checks_attempts"],
             'datatype': int,
-            'projections': ['host.max_checks_attempts'],
             'filters': {
                 'attr': 'host.max_checks_attempts',
             },
@@ -1370,7 +1297,6 @@ livestatus_attribute_map = {
             'description': 'A bitmask specifying which attributes have been modified',
             'function': lambda item: len(item["host"]["modified_attributes"]),
             'datatype': int,
-            'projections': ['host.modified_attributes'],
             'filters': {
                 'attr': 'host.modified_attributes',
             },
@@ -1389,7 +1315,6 @@ livestatus_attribute_map = {
             'description': 'Scheduled time for the next check (Unix timestamp)',
             'function': lambda item: item["host"]["alias"],
             'datatype': int,
-            'projections': ['host.next_chk'],
             'filters': {
                 'attr': 'host.next_chk',
             },
@@ -1403,7 +1328,6 @@ livestatus_attribute_map = {
         'host_notes': {
             'description': 'Optional notes about the service',
             'function': lambda item: item["host"]["notes"],
-            'projections': ['host.notes'],
             'filters': {
                 'attr': 'host.notes',
             },
@@ -1416,7 +1340,6 @@ livestatus_attribute_map = {
         'host_notes_url': {
             'description': 'An optional URL with further information about the host',
             'function': lambda item: item["host"]["notes_url"],
-            'projections': ['host.notes_url'],
             'filters': {
                 'attr': 'host.notes_url',
             },
@@ -1430,7 +1353,6 @@ livestatus_attribute_map = {
             'description': 'Interval of periodic notification or 0 if its off',
             'function': lambda item: item["host"]["notification_interval"],
             'datatype': float,
-            'projections': ['host.notification_interval'],
             'filters': {
                 'attr': 'host.notification_interval',
             },
@@ -1438,7 +1360,6 @@ livestatus_attribute_map = {
         'host_notification_period': {
             'description': 'Time period in which problems of this host will be notified. If empty then notification will be always',
             'function': lambda item: item["host"]["notification_period"],
-            'projections': ['host.notification_period'],
             'filters': {
                 'attr': 'host.notification_period',
             },
@@ -1447,7 +1368,6 @@ livestatus_attribute_map = {
             'description': 'Whether notifications of the host are enabled (0/1)',
             'function': lambda item: item["host"]["notifications_enabled"],
             'datatype': bool,
-            'projections': ['host.notifications_enabled'],
             'filters': {
                 'attr': 'host.notifications_enabled',
             },
@@ -1456,7 +1376,6 @@ livestatus_attribute_map = {
             'description': 'Whether to stop sending notifications (0/1)',
             'function': lambda item: item["host"]["no_more_notifications"],
             'datatype': bool,
-            'projections': ['host.no_more_notifications'],
             'filters': {
                 'attr': 'host.no_more_notifications',
             },
@@ -1531,7 +1450,6 @@ livestatus_attribute_map = {
             'description': 'A list of all direct parents of the host',
             'function': lambda item: item["host"]["alias"],
             'datatype':list,
-            'projections': ['host.alias'],
             'filters': {
                 'attr': 'host.alias',
             },
@@ -1540,7 +1458,6 @@ livestatus_attribute_map = {
             'description': 'Whether a flex downtime is pending (0/1)',
             'function': lambda item: item["host"]["pending_flex_downtimes"],
             'datatype': int,
-            'projections': ['host.pending_flex_downtimes'],
             'filters': {
                 'attr': 'host.pending_flex_downtimes',
             },
@@ -1549,7 +1466,6 @@ livestatus_attribute_map = {
             'description': 'Percent state change',
             'function': lambda item: item["host"]["percent_state_change"],
             'datatype': float,
-            'projections': ['host.percent_state_change'],
             'filters': {
                 'attr': 'host.percent_state_change',
             },
@@ -1557,7 +1473,6 @@ livestatus_attribute_map = {
         'host_perf_data': {
             'description': 'Optional performance data of the last host check',
             'function': lambda item: item["host"]["perf_data"],
-            'projections': ['host.perf_data'],
             'filters': {
                 'attr': 'host.perf_data',
             },
@@ -1565,7 +1480,6 @@ livestatus_attribute_map = {
         'host_plugin_output': {
             'description': 'Output of the last host check',
             'function': lambda item: item["host"]["output"],
-            'projections': ['host.output'],
             'filters': {
                 'attr': 'host.output',
             },
@@ -1580,7 +1494,6 @@ livestatus_attribute_map = {
             'description': 'Whether processing of performance data is enabled (0/1)',
             'function': lambda item: item["host"]["process_performances_data"],
             'datatype': bool,
-            'projections': ['host.process_performances_data'],
             'filters': {
                 'attr': 'host.process_performances_data',
             },
@@ -1589,7 +1502,6 @@ livestatus_attribute_map = {
             'description': 'Number of basic interval lengths between checks when retrying after a soft error',
             'function': lambda item: item["host"]["retry_interval"],
             'datatype': float,
-            'projections': ['host.retry_interval'],
             'filters': {
                 'attr': 'host.retry_interval',
             },
@@ -1598,7 +1510,6 @@ livestatus_attribute_map = {
             'description': 'The number of downtimes this host is currently in',
             'function': lambda item: item["host"]["scheduled_downtime_depth"],
             'datatype': int,
-            'projections': ['host.scheduled_downtime_depth'],
             'filters': {
                 'attr': 'host.scheduled_downtime_depth',
             },
@@ -1625,7 +1536,6 @@ livestatus_attribute_map = {
             'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
             'function': lambda item: item["host"]["state_id"],
             'datatype': int,
-            'projections': ['host.state_id'],
             'filters': {
                 'attr': 'host.state_id',
             },
@@ -1634,7 +1544,6 @@ livestatus_attribute_map = {
             'description': 'Type of the current state (0: soft, 1: hard)',
             'function': lambda item: item["host"]["state_type_id"],
             'datatype': int,
-            'projections': ['host.state_type_id'],
             'filters': {
                 'attr': 'host.state_type_id',
             },
@@ -1642,14 +1551,14 @@ livestatus_attribute_map = {
         'host_statusmap_image': {
             'description': 'The name of in image file for the status map',
             'function': lambda item: item["host"]["statusmap_image"],
-            'projections': ['host.statusmap_image'],
-            'filters': {},
+            'filters': {
+                'attr': 'host.statusmap_image',
+            },
         },
         'host_tags': {
             'description': 'The list of Host Tags',
             'function': lambda item: item["host"]["tags"],
             'datatype': list,
-            'projections': ['host.tags'],
             'filters': {
                 'attr': 'host.tags',
             },
@@ -1676,7 +1585,6 @@ livestatus_attribute_map = {
             'description': '3D-Coordinates: X',
             'function': lambda item: item["host"]["x_3d"],
             'datatype': float,
-            'projections': ['host.x_3d'],
             'filters': {
                 'attr': 'host.x_3d',
             },
@@ -1685,7 +1593,6 @@ livestatus_attribute_map = {
             'description': '3D-Coordinates: Y',
             'function': lambda item: item["host"]["y_3d"],
             'datatype': float,
-            'projections': ['host.y_3d'],
             'filters': {
                 'attr': 'host.y_3d',
             },
@@ -1694,7 +1601,6 @@ livestatus_attribute_map = {
             'description': '3D-Coordinates: Z',
             'function': lambda item: item["host"]["z_3d"],
             'datatype': float,
-            'projections': ['host.z_3d'],
             'filters': {
                 'attr': 'host.z_3d',
             },
@@ -1705,7 +1611,6 @@ livestatus_attribute_map = {
             'description': 'Whether the service accepts passive checks (0/1)',
             'function': lambda item: item["passive_checks_enabled"],
             'datatype': bool,
-            'projections': ['passive_checks_enabled'],
             'filters': {
                 'attr': 'passive_checks_enabled',
             },
@@ -1714,7 +1619,6 @@ livestatus_attribute_map = {
             'description': 'Whether the current service problem has been acknowledged (0/1)',
             'function': lambda item: item["problem_has_been_acknowledged"],
             'datatype': bool,
-            'projections': ['problem_has_been_acknowledged'],
             'filters': {
                 'attr': 'problem_has_been_acknowledged',
             },
@@ -1773,7 +1677,6 @@ livestatus_attribute_map = {
             'description': 'Whether active checks are enabled for the service (0/1)',
             'function': lambda item: item["active_checks_enabled"],
             'datatype': bool,
-            'projections': ['active_checks_enabled'],
             'filters': {
                 'attr': 'active_checks_enabled',
             },
@@ -1811,7 +1714,6 @@ livestatus_attribute_map = {
             'description': 'The importance we gave to this service between the minimum 0 and the maximum 5',
             'function': lambda item: item["business_impact"],
             'datatype': int,
-            'projections': ['business_impact'],
             'filters': {
                 'attr': 'business_impact',
             },
@@ -1820,7 +1722,6 @@ livestatus_attribute_map = {
             'description': 'The number of the current check attempt',
             'function': lambda item: item["attempt"],
             'datatype': int,
-            'projections': ['attempt'],
             'filters': {
                 'attr': 'attempt',
             },
@@ -1854,7 +1755,6 @@ livestatus_attribute_map = {
         'description': {
             'description': 'Description of the service (also used as key)',
             'function': lambda item: item["service_description"],
-            'projections': ['service_description'],
             'filters': {
                 'attr': 'service_description',
             },
@@ -1909,7 +1809,6 @@ livestatus_attribute_map = {
             'description': 'A list of all service groups the service is in',
             'function': lambda item: item["servicegroups"],
             'datatype': list,
-            'projections': ['servicegroups'],
             'filters': {
                 'attr': 'servicegroups',
             },
@@ -2155,7 +2054,6 @@ livestatus_attribute_map = {
         'plugin_output': {
             'description': 'Output of the last check plugin',
             'function': lambda item: item["output"],
-            'projections': ['output'],
             'filters': {
                 'attr': 'output',
             },
@@ -2197,7 +2095,6 @@ livestatus_attribute_map = {
             'description': 'The current state of the service (0: OK, 1: WARN, 2: CRITICAL, 3: UNKNOWN)',
             'function': lambda item: item["state_id"],
             'datatype': int,
-            'projections': ['state_id'],
             'filters': {
                 'attr': 'state_id',
             },
@@ -2206,7 +2103,6 @@ livestatus_attribute_map = {
             'description': 'The type of the current state (0: soft, 1: hard)',
             'function': lambda item: item["state_type_id"],
             'datatype': int,
-            'projections': ['state_type_id'],
             'filters': {
                 'attr': 'state_type_id',
             },
@@ -2217,7 +2113,6 @@ livestatus_attribute_map = {
             'description': 'Whether passive service checks are accepted (0/1)',
             'function': lambda item: item["service"]["problem_has_been_acknowledged"],
             'datatype': bool,
-            'projections': ['service.passive_checks_enabled'],
             'filters': {
                 'attr': 'service.passive_checks_enabled',
             },
@@ -2226,7 +2121,6 @@ livestatus_attribute_map = {
             'description': 'Whether the current service problem has been acknowledged (0/1)',
             'function': lambda item: item["service"]["problem_has_been_acknowledged"],
             'datatype': bool,
-            'projections': ['service.problem_has_been_acknowledged'],
             'filters': {
                 'attr': 'service.problem_has_been_acknowledged',
             },
@@ -2235,7 +2129,6 @@ livestatus_attribute_map = {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
             'function': lambda item: item["service"]["acknowledgement_type"],
             'datatype': int,
-            'projections': ['service.acknowledgement_type'],
             'filters': {
                 'attr': 'service.acknowledgement_type',
             },
@@ -2243,7 +2136,6 @@ livestatus_attribute_map = {
         'service_action_url': {
             'description': 'An optional URL to custom actions or information about this service',
             'function': lambda item: item["service"]["action_url"],
-            'projections': ['service.action_url'],
             'filters': {
                 'attr': 'service.action_url',
             },
@@ -2257,7 +2149,6 @@ livestatus_attribute_map = {
         'service_active_checks_enabled': {
             'description': 'Whether active checks are enabled for the service (0/1)',
             'function': lambda item: item["service"]["active_checks_enabled"],
-            'projections': ['service.active_checks_enabled'],
             'filters': {
                 'attr': 'service.active_checks_enabled',
             },
@@ -2265,7 +2156,6 @@ livestatus_attribute_map = {
         'service_check_command': {
             'description': 'Nagios command used for active checks',
             'function': lambda item: item["service"]["check_command"],
-            'projections': ['service.check_command'],
             'filters': {
                 'attr': 'service.check_command',
             },
@@ -2274,7 +2164,6 @@ livestatus_attribute_map = {
             'description': 'Number of basic interval lengths between two scheduled checks of the service',
             'function': lambda item: item["service"]["check_interval"],
             'datatype': float,
-            'projections': ['service.check_interval'],
             'filters': {
                 'attr': 'service.check_interval',
             },
@@ -2282,7 +2171,6 @@ livestatus_attribute_map = {
         'service_check_options': {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
             'function': lambda item: item["service"]["alias"],
-            'projections': ['service.alias'],
             'filters': {
                 'attr': 'service.alias',
             },
@@ -2290,7 +2178,6 @@ livestatus_attribute_map = {
         'service_check_period': {
             'description': 'Time period in which this service will be checked. If empty then the service will always be checked.',
             'function': lambda item: item["service"]["alias"],
-            'projections': ['service.alias'],
             'filters': {
                 'attr': 'service.alias',
             },
@@ -2306,7 +2193,6 @@ livestatus_attribute_map = {
             'description': 'Whether active checks of the service are enabled (0/1)',
             'function': lambda item: item["service"]["checks_enabled"],
             'datatype': bool,
-            'projections': ['service.checks_enabled'],
             'filters': {
                 'attr': 'service.checks_enabled',
             },
@@ -2315,7 +2201,6 @@ livestatus_attribute_map = {
             'description': 'A list of the ids of all comments of this service',
             'function': lambda item: item["service"]["comments"],
             'datatype': list,
-            'projections': ['service.comments'],
             'filters': {
                 'attr': 'service.comments',
             },
@@ -2331,7 +2216,6 @@ livestatus_attribute_map = {
             'description': 'A list of all contacts of this service, either direct or via a contact group',
             'function': lambda item: item["service"]["contacts"],
             'datatype': list,
-            'projections': ['service.contacts'],
             'filters': {
                 'attr': 'service.contacts',
             },
@@ -2340,7 +2224,6 @@ livestatus_attribute_map = {
             'description': 'A list of all contact groups this service is in',
             'function': lambda item: item["service"]["contact_groups"],
             'datatype': list,
-            'projections': ['service.contact_groups'],
             'filters': {
                 'attr': 'service.contact_groups',
             },
@@ -2349,7 +2232,6 @@ livestatus_attribute_map = {
             'description': 'Number of the current check attempts',
             'function': lambda item: item["service"]["attempt"],
             'datatype': int,
-            'projections': ['service.attempt'],
             'filters': {
                 'attr': 'service.attempt',
             },
@@ -2358,7 +2240,6 @@ livestatus_attribute_map = {
             'description': 'Number of the current notification',
             'function': lambda item: item["service"]["current_notification_number"],
             'datatype': int,
-            'projections': ['service.current_notification_number'],
             'filters': {
                 'attr': 'service.current_notification_number',
             },
@@ -2387,7 +2268,6 @@ livestatus_attribute_map = {
         'service_display_name': {
             'description': 'Optional display name of the service - not used by Nagios\' web interface',
             'function': lambda item: item["service"]["display_name"],
-            'projections': ['service.display_name'],
             'filters': {
                 'attr': 'service.display_name',
             },
@@ -2410,7 +2290,6 @@ livestatus_attribute_map = {
         'service_event_handler': {
             'description': 'Nagios command used as event handler of this service',
             'function': lambda item: item["service"]["event_handler"],
-            'projections': ['service.event_handler'],
             'filters': {
                 'attr': 'service.event_handler',
             },
@@ -2419,7 +2298,6 @@ livestatus_attribute_map = {
             'description': 'Whether event handling is enabled for the service (0/1)',
             'function': lambda item: item["service"]["event_handler_enabled"],
             'datatype': bool,
-            'projections': ['service.event_handler_enabled'],
             'filters': {
                 'attr': 'service.event_handler_enabled',
             },
@@ -2428,7 +2306,6 @@ livestatus_attribute_map = {
             'description': 'Time the service check needed for execution',
             'function': lambda item: item["service"]["execution_time"],
             'datatype': float,
-            'projections': ['service.execution_time'],
             'filters': {
                 'attr': 'service.execution_time',
             },
@@ -2437,7 +2314,6 @@ livestatus_attribute_map = {
             'description': 'Delay before the first notification',
             'function': lambda item: item["service"]["first_notification_delay"],
             'datatype': float,
-            'projections': ['service.first_notification_delay'],
             'filters': {
                 'attr': 'service.first_notification_delay',
             },
@@ -2446,7 +2322,6 @@ livestatus_attribute_map = {
             'description': 'Whether flap detection is enabled (0/1)',
             'function': lambda item: item["service"]["flap_detection_enabled"],
             'datatype': bool,
-            'projections': ['service.flap_detection_enabled'],
             'filters': {
                 'attr': 'service.flap_detection_enabled',
             },
@@ -2455,7 +2330,6 @@ livestatus_attribute_map = {
             'description': 'A list of all service groups this service is in',
             'function': lambda item: item["service"]["servicegroups"],
             'datatype': list,
-            'projections': ['service.servicegroups'],
             'filters': {
                 'attr': 'service.servicegroups',
             },
@@ -2464,7 +2338,6 @@ livestatus_attribute_map = {
             'description': 'Whether the service has already been checked (0/1)',
             'function': lambda item: item["service"]["has_been_checked"],
             'datatype': bool,
-            'projections': ['service.has_been_checked'],
             'filters': {
                 'attr': 'service.has_been_checked',
             },
@@ -2473,7 +2346,6 @@ livestatus_attribute_map = {
             'description': 'High threshold of flap detection',
             'function': lambda item: item["service"]["high_flap_threshold"],
             'datatype': float,
-            'projections': ['service.high_flap_threshold'],
             'filters': {
                 'attr': 'service.high_flap_threshold',
             },
@@ -2481,7 +2353,6 @@ livestatus_attribute_map = {
         'service_icon_image': {
             'description': 'The name of an image file to be used in the web pages',
             'function': lambda item: item["service"]["icon_image"],
-            'projections': ['service.icon_image'],
             'filters': {
                 'attr': 'service.icon_image',
             },
@@ -2489,7 +2360,6 @@ livestatus_attribute_map = {
         'service_icon_image_alt': {
             'description': 'Alternative text for the icon_image',
             'function': lambda item: item["service"]["icon_image_alt"],
-            'projections': ['service.icon_image_alt'],
             'filters': {
                 'attr': 'service.icon_image_alt',
             },
@@ -2518,7 +2388,6 @@ livestatus_attribute_map = {
             'description': 'Initial service state',
             'function': lambda item: item["service"]["initial_state"],
             'datatype': int,
-            'projections': ['service.initial_state'],
             'filters': {
                 'attr': 'service.initial_state',
             },
@@ -2533,7 +2402,6 @@ livestatus_attribute_map = {
             'description': 'Whether the service state is flapping (0/1)',
             'function': lambda item: item["service"]["is_flapping"],
             'datatype': bool,
-            'projections': ['service.is_flapping'],
             'filters': {
                 'attr': 'service.is_flapping',
             },
@@ -2542,7 +2410,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last check (Unix timestamp)',
             'function': lambda item: item["service"]["last_chk"],
             'datatype': int,
-            'projections': ['service.last_chk'],
             'filters': {
                 'attr': 'service.last_chk',
             },
@@ -2551,7 +2418,6 @@ livestatus_attribute_map = {
             'description': 'Last hard state',
             'function': lambda item: item["service"]["last_hard_state_id"],
             'datatype': int,
-            'projections': ['service.last_hard_state_id'],
             'filters': {
                 'attr': 'service.last_hard_state_id',
             },
@@ -2560,7 +2426,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last hard state change (Unix timestamp)',
             'function': lambda item: item["service"]["last_hard_state_change"],
             'datatype': int,
-            'projections': ['service.last_hard_state_change'],
             'filters': {
                 'attr': 'service.last_hard_state_change',
             },
@@ -2569,7 +2434,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last notification (Unix timestamp)',
             'function': lambda item: item["service"]["last_notification"],
             'datatype': int,
-            'projections': ['service.last_notification'],
             'filters': {
                 'attr': 'service.last_notification',
             },
@@ -2578,7 +2442,6 @@ livestatus_attribute_map = {
             'description': 'State before last state change',
             'function': lambda item: item["service"]["last_state"],
             'datatype': int,
-            'projections': ['service.last_state'],
             'filters': {
                 'attr': 'service.last_state',
             },
@@ -2587,7 +2450,6 @@ livestatus_attribute_map = {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
             'function': lambda item: item["service"]["last_state_change"],
             'datatype': int,
-            'projections': ['service.last_state_change'],
             'filters': {
                 'attr': 'service.last_state_change',
             },
@@ -2596,7 +2458,6 @@ livestatus_attribute_map = {
             'description': 'The last time the service was DOWN (Unix timestamp)',
             'function': lambda item: item["service"]["last_time_down"],
             'datatype': int,
-            'projections': ['service.last_time_down'],
             'filters': {
                 'attr': 'service.last_time_down',
             },
@@ -2605,7 +2466,6 @@ livestatus_attribute_map = {
             'description': 'The last time the service was UNREACHABLE (Unix timestamp)',
             'function': lambda item: item["service"]["last_time_unreachable"],
             'datatype': int,
-            'projections': ['service.last_time_unreachable'],
             'filters': {
                 'attr': 'service.last_time_unreachable',
             },
@@ -2614,7 +2474,6 @@ livestatus_attribute_map = {
             'description': 'The last time the service was UP (Unix timestamp)',
             'function': lambda item: item["service"]["last_time_up"],
             'datatype': int,
-            'projections': ['service.last_time_up'],
             'filters': {
                 'attr': 'service.last_time_up',
             },
@@ -2623,7 +2482,6 @@ livestatus_attribute_map = {
             'description': 'Time difference between scheduled check time and actual check time',
             'function': lambda item: item["service"]["latency"],
             'datatype': float,
-            'projections': ['service.latency'],
             'filters': {
                 'attr': 'service.latency',
             },
@@ -2631,7 +2489,6 @@ livestatus_attribute_map = {
         'service_long_plugin_output': {
             'description': 'Complete output from check plugin',
             'function': lambda item: item["service"]["long_output"],
-            'projections': ['service.long_output'],
             'filters': {
                 'attr': 'service.long_output',
             },
@@ -2640,7 +2497,6 @@ livestatus_attribute_map = {
             'description': 'Low threshold of flap detection',
             'function': lambda item: item["service"]["low_flap_threshold"],
             'datatype': float,
-            'projections': ['service.low_flap_threshold'],
             'filters': {
                 'attr': 'service.low_flap_threshold',
             },
@@ -2649,7 +2505,6 @@ livestatus_attribute_map = {
             'description': 'Max check attempts for active service checks',
             'function': lambda item: item["service"]["max_checks_attempts"],
             'datatype': int,
-            'projections': ['service.max_checks_attempts'],
             'filters': {
                 'attr': 'service.max_checks_attempts',
             },
@@ -2658,7 +2513,6 @@ livestatus_attribute_map = {
             'description': 'A bitmask specifying which attributes have been modified',
             'function': lambda item: len(item["service"]["modified_attributes"]),
             'datatype': int,
-            'projections': ['service.modified_attributes'],
             'filters': {
                 'attr': 'service.modified_attributes',
             },
@@ -2673,7 +2527,6 @@ livestatus_attribute_map = {
             'description': 'Scheduled time for the next check (Unix timestamp)',
             'function': lambda item: item["service"]["alias"],
             'datatype': int,
-            'projections': ['service.next_chk'],
             'filters': {
                 'attr': 'service.next_chk',
             },
@@ -2687,7 +2540,6 @@ livestatus_attribute_map = {
         'service_notes': {
             'description': 'Optional notes about the service',
             'function': lambda item: item["service"]["notes"],
-            'projections': ['service.notes'],
             'filters': {
                 'attr': 'service.notes',
             },
@@ -2700,7 +2552,6 @@ livestatus_attribute_map = {
         'service_notes_url': {
             'description': 'An optional URL with further information about the service',
             'function': lambda item: item["service"]["notes_url"],
-            'projections': ['service.notes_url'],
             'filters': {
                 'attr': 'service.notes_url',
             },
@@ -2714,7 +2565,6 @@ livestatus_attribute_map = {
             'description': 'Interval of periodic notification or 0 if its off',
             'function': lambda item: item["service"]["notification_interval"],
             'datatype': float,
-            'projections': ['service.notification_interval'],
             'filters': {
                 'attr': 'service.notification_interval',
             },
@@ -2722,7 +2572,6 @@ livestatus_attribute_map = {
         'service_notification_period': {
             'description': 'Time period in which problems of this service will be notified. If empty then notification will be always',
             'function': lambda item: item["service"]["notification_period"],
-            'projections': ['service.notification_period'],
             'filters': {
                 'attr': 'service.notification_period',
             },
@@ -2731,7 +2580,6 @@ livestatus_attribute_map = {
             'description': 'Whether notifications of the service are enabled (0/1)',
             'function': lambda item: item["service"]["notifications_enabled"],
             'datatype': bool,
-            'projections': ['service.notifications_enabled'],
             'filters': {
                 'attr': 'service.notifications_enabled',
             },
@@ -2740,7 +2588,6 @@ livestatus_attribute_map = {
             'description': 'Whether to stop sending notifications (0/1)',
             'function': lambda item: item["service"]["no_more_notifications"],
             'datatype': bool,
-            'projections': ['service.no_more_notifications'],
             'filters': {
                 'attr': 'service.no_more_notifications',
             },
@@ -2749,7 +2596,6 @@ livestatus_attribute_map = {
             'description': 'Percent state change',
             'function': lambda item: item["service"]["percent_state_change"],
             'datatype': float,
-            'projections': ['service.percent_state_change'],
             'filters': {
                 'attr': 'service.percent_state_change',
             },
@@ -2757,7 +2603,6 @@ livestatus_attribute_map = {
         'service_perf_data': {
             'description': 'Optional performance data of the last service check',
             'function': lambda item: item["service"]["perf_data"],
-            'projections': ['service.perf_data'],
             'filters': {
                 'attr': 'service.perf_data',
             },
@@ -2765,7 +2610,6 @@ livestatus_attribute_map = {
         'service_plugin_output': {
             'description': 'Output of the last service check',
             'function': lambda item: item["service"]["output"],
-            'projections': ['service.output'],
             'filters': {
                 'attr': 'service.output',
             },
@@ -2780,7 +2624,6 @@ livestatus_attribute_map = {
             'description': 'Whether processing of performance data is enabled (0/1)',
             'function': lambda item: item["service"]["process_performances_data"],
             'datatype': bool,
-            'projections': ['service.process_performances_data'],
             'filters': {
                 'attr': 'service.process_performances_data',
             },
@@ -2789,7 +2632,6 @@ livestatus_attribute_map = {
             'description': 'Number of basic interval lengths between checks when retrying after a soft error',
             'function': lambda item: item["service"]["retry_interval"],
             'datatype': float,
-            'projections': ['service.retry_interval'],
             'filters': {
                 'attr': 'service.retry_interval',
             },
@@ -2798,7 +2640,6 @@ livestatus_attribute_map = {
             'description': 'The number of downtimes this service is currently in',
             'function': lambda item: item["service"]["scheduled_downtime_depth"],
             'datatype': int,
-            'projections': ['service.scheduled_downtime_depth'],
             'filters': {
                 'attr': 'service.scheduled_downtime_depth',
             },
@@ -2807,7 +2648,6 @@ livestatus_attribute_map = {
             'description': 'The current state of the service (0: up, 1: down, 2: unreachable)',
             'function': lambda item: item["service"]["state_id"],
             'datatype': int,
-            'projections': ['service.state_id'],
             'filters': {
                 'attr': 'service.state_id',
             },
@@ -2816,10 +2656,95 @@ livestatus_attribute_map = {
             'description': 'Type of the current state (0: soft, 1: hard)',
             'function': lambda item: item["service"]["state_type_id"],
             'datatype': int,
-            'projections': ['service.state_type_id'],
             'filters': {
                 'attr': 'service.state_type_id',
             },
+        },
+    },
+    'ServicesLink': {
+        'num_services': {
+            'description': 'The total number of services of the host',
+            'function': lambda item: len(item["services"]),
+            'projections': ['services.service_description'],
+            'filters': {},
+        },
+        'num_services_crit': {
+            'description': 'The number of the host\'s services with the soft state CRIT',
+            'function': lambda item: state_count(item, "services", 0, 2),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_hard_crit': {
+            'description': 'The number of the host\'s services with the hard state CRIT',
+            'function': lambda item: state_count(item, "services", 1, 2),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_hard_ok': {
+            'description': 'The number of the host\'s services with the hard state OK',
+            'function': lambda item: state_count(item, "services", 1, 0),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_hard_unknown': {
+            'description': 'The number of the host\'s services with the hard state UNKNOWN',
+            'function': lambda item: state_count(item, "services", 1, 3),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_hard_warn': {
+            'description': 'The number of the host\'s services with the hard state WARN',
+            'function': lambda item: state_count(item, "services", 1, 1),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_ok': {
+            'description': 'The number of the host\'s services with the soft state OK',
+            'function': lambda item: state_count(item, "services", 0, 0),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_pending': {
+            'description': 'The number of the host\'s services which have not been checked yet (pending)',
+            'function': lambda item: state_count(item, "services", state_id="PENDING"),
+            'datatype': int,
+            'projections': ['services.state', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_unknown': {
+            'description': 'The number of the host\'s services with the soft state UNKNOWN',
+            'function': lambda item: state_count(item, "services", 0, 3),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'num_services_warn': {
+            'description': 'The number of the host\'s services with the soft state WARN',
+            'function': lambda item: state_count(item, "services", 0, 1),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'worst_service_hard_state': {
+            'description': 'The worst state of all services that belong to a host of this group (OK <= WARN <= UNKNOWN <= CRIT)',
+            'function': lambda item: state_worst(item, "services", 1),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+        },
+        'worst_service_state': {
+            'description': 'The worst state of all services that belong to a host of this group (OK <= WARN <= UNKNOWN <= CRIT)',
+            'function': lambda item: state_worst(item, "services", 0),
+            'datatype': int,
+            'projections': ['services.state_id', 'services.state_type_id'],
+            'filters': {},
+            'datatype': int,
         },
     },
     'Hostgroup': {
@@ -2899,90 +2824,12 @@ livestatus_attribute_map = {
             'projections': ["services.state_id"],
             'filters': {},
         },
-        'num_services_crit': {
-            'description': 'The total number of services with the state CRIT of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_crit': {
-            'description': 'The total number of services with the state CRIT of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_ok': {
-            'description': 'The total number of services with the state OK of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_unknown': {
-            'description': 'The total number of services with the state UNKNOWN of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_warn': {
-            'description': 'The total number of services with the state WARN of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_ok': {
-            'description': 'The total number of services with the state OK of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_pending': {
-            'description': 'The total number of services with the state Pending of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_unknown': {
-            'description': 'The total number of services with the state UNKNOWN of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_warn': {
-            'description': 'The total number of services with the state WARN of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
         'worst_host_state': {
             'description': 'The worst state of all of the groups\' hosts (UP <= UNREACHABLE <= DOWN)',
             'function': lambda item: 0, #FIXME
             'datatype': int,
             'projections': ["services.state_id"],
             'filters': {},
-        },
-        'worst_service_hard_state': {
-            'description': 'The worst state of all services that belong to a host of this group (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'worst_service_state': {
-            'description': 'The worst state of all services that belong to a host of this group (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-            'datatype': int,
         },
     },
     'Servicegroup': {
@@ -3009,7 +2856,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the service group',
             'function': lambda item: item["servicegroup_name"],
-            'projections': ['sevicegroup_name'],
             'filters': {
                 'attr': 'servicegroup_name',
             },
@@ -3029,73 +2875,6 @@ livestatus_attribute_map = {
         },
         'num_services_crit': {
             'description': 'The number of services in the group that are CRIT',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_crit': {
-            'description': 'The number of services in the group that are CRIT',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_ok': {
-            'description': 'The number of services in the group that are OK',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_unknown': {
-            'description': 'The number of services in the group that are UNKNOWN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_hard_warn': {
-            'description': 'The number of services in the group that are WARN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_ok': {
-            'description': 'The number of services in the group that are OK',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_pending': {
-            'description': 'The number of services in the group that are PENDING',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_unknown': {
-            'description': 'The number of services in the group that are UNKNOWN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'num_services_warn': {
-            'description': 'The number of services in the group that are WARN',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projections': ["services.state_id"],
-            'filters': {},
-        },
-        'servicegroup_name': {
-            'description': 'The name of the service group',
-            'function': lambda item: item["servicegroup_name"],
-        },
-        'worst_service_state': {
-            'description': 'The worst soft state of all of the groups services (OK <= WARN <= UNKNOWN <= CRIT)',
             'function': lambda item: 0, #FIXME
             'datatype': int,
             'projections': ["services.state_id"],
@@ -3243,7 +3022,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the contactgroup',
             'function': lambda item: item["contactgroup_name"],
-            'projections': ['contactgroup_name'],
             'filters': {
                 'attr': 'contactgroup_name',
             },
@@ -3262,7 +3040,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the timeperiod',
             'function': lambda item: item["timeperiod_name"],
-            'projections': ['timeperiod_name'],
             'filters': {
                 'attr': 'timeperiod_name',
             },
@@ -3284,7 +3061,6 @@ livestatus_attribute_map = {
         'line': {
             'description': 'The shell command line',
             'function': lambda item: item["command_line"],
-            'projections': ['command_line'],
             'filters': {
                 'attr': 'command_line',
             },
@@ -3292,7 +3068,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the command',
             'function': lambda item: item["command_name"],
-            'projections': ['command_name'],
             'filters': {
                 'attr': 'command_name',
             },
@@ -3311,7 +3086,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the scheduler',
             'function': lambda item: item["scheduler_name"],  # REPAIRME
-            'projections': ['scheduler_name'],
             'filters': {
                 'attr': 'scheduler_name',
             },
@@ -3349,7 +3123,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the poller',
             'function': lambda item: item["poller_name"],  # REPAIRME
-            'projections': ['poller_name'],
             'filters': {
                 'attr': 'poller_name',
             },
@@ -3382,7 +3155,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the reactionner',
             'function': lambda item: item["reactionner_name"],  # REPAIRME
-            'projections': ['reactionner_name'],
             'filters': {
                 'attr': 'reactionner_name',
             },
@@ -3419,7 +3191,6 @@ livestatus_attribute_map = {
         'name': {
             'description': 'The name of the broker',
             'function': lambda item: item["broker_name"],  # REPAIRME
-            'projections': ['broker_name'],
             'filters': {
                 'attr': 'broker_name',
             },
@@ -4778,11 +4549,15 @@ livestatus_attribute_map = {
 for class_map in ("Comment", "Downtime", "Service"):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["HostLink"]
-)
+    )
 for class_map in ("Comment", "Downtime"):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["ServiceLink"]
-)
+    )
+for class_map in ('Host', 'Servicegroup'):
+    livestatus_attribute_map[class_map].update(
+        livestatus_attribute_map["ServicesLink"]
+    )
 
 table_class_map = {
     'hosts': livestatus_attribute_map['Host'],

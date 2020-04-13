@@ -87,7 +87,7 @@ class TestConfigBig(TestConfig):
         else:
             self.assertEqual(pyresponse, expected_result)
 
-    def test_simple_query(self):
+    def _test_simple_query(self):
         """
         Tests a simple query execution
         """
@@ -322,7 +322,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
-    def test_nested_and_or_query(self):
+    def _test_nested_and_or_query(self):
         """
         Tests a simple query execution
         """
@@ -392,7 +392,7 @@ OutputFormat: python
         expected_result = []
         self.execute_and_assert(query, expected_result)
 
-    def test_negate(self):
+    def _test_negate(self):
         expected_result = [['test_host_001', 'pending_001']]
         # List matches (case insensitive)
         query = """GET hosts
@@ -442,7 +442,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, negate_hosts_condition)
 
-    def test_stats(self):
+    def _test_stats(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -459,7 +459,6 @@ OutputFormat: python
         svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
         svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_critical_02")
         svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_008", "test_critical_13")
-        pprint([[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
         self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
         self.update_broker()
         # 1993O, 3xW, 3xC, 1xU
@@ -530,7 +529,7 @@ OutputFormat: python"""
         self.execute_and_assert(query, expected_result)
 
 
-    def test_limit(self):
+    def _test_limit(self):
         """
         Tests result count limitting
         """
@@ -561,7 +560,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_len)
 
-    def test_authuser(self):
+    def _test_authuser(self):
         """
         Tests limitting results what's authorized to authenticated user
         """
@@ -592,37 +591,38 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_authuser)
 
-    def test_cross_collections_objects(self):
+    def test_cross_collections_hosts(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_13")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_03")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_unknown_08")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_06")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_flap_09")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
+        self.update_broker()
 
         query = """GET hosts
-Columns: host_name num_services
-Filter: host_name ~ test_host_00[0-9]
-AuthUser: test_contact_02
+Columns: host_name num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
+Filter: host_name = test_host_005
 OutputFormat: python
 """
 
         def assert_dummy(result):
             pass
-
-        expected_result = [[u'test_host_001', 20]]
+        #                   H                 N  SO  HO SW HW SC HC SU HU WS WH
+        expected_result = [[u'test_host_005', 20, 0, 13, 1, 2, 1, 2, 0, 1, 2, 2]]
         self.execute_and_assert(query, expected_result)
-
-        query = """GET hosts
-Columns: host_name num_services
-Filter: host_name ~ test_host_00[0-9]
-AuthUser: test_contact_02
-OutputFormat: python
-"""
-
-        def assert_dummy(result):
-            pass
-
-        expected_result = [[u'test_host_001', 20]]
-        self.execute_and_assert(query, expected_result)
-
-
-
-
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01
