@@ -87,7 +87,7 @@ class LiveStatusMongoQuery(object):
         self.response = LiveStatusMongoResponse()
         self.authuser = None
         self.table = None
-        self.columns = []
+        self.columns = None
         self.filtercolumns = []
         self.prefiltercolumns = []
         self.outputcolumns = []
@@ -134,7 +134,9 @@ class LiveStatusMongoQuery(object):
     def split_option_with_columns(self, line):
         """Split a line in a command and a list of words"""
         cmd, columns = self.split_option(line)
-        return cmd, [self.strip_table_from_column(c) for c in re.compile(r'\s+').split(columns)]
+        mapping = table_class_map[self.table]
+        table_columns = mapping.keys()
+        return cmd, [c for c in columns.split() if c in table_columns]
 
     def strip_table_from_column(self, column):
         """Cut off the table name, because it is possible
@@ -171,7 +173,7 @@ class LiveStatusMongoQuery(object):
         # Stats: scheduled_downtime_depth = 0
         if operator in ['=', '>', '>=', '<', '<=', '=~', '~', '~~', '!=', '!>', '!>=', '!<', '!<=', '!=~', '!~', '!~~']:
             # Cut off the table name
-            attribute = self.strip_table_from_column(attribute)
+            #attribute = self.strip_table_from_column(attribute)
             # Some operators can simply be negated
             if operator in ['!>', '!>=', '!<', '!<=']:
                 operator = {'!>': '<=', '!>=': '<', '!<': '>=', '!<=': '>'}[operator]
@@ -355,10 +357,10 @@ class LiveStatusMongoQuery(object):
             else:
                 # If the pnpgraph_present column is involved, then check
                 # with each request if the pnp perfdata path exists
-                if 'pnpgraph_present' in self.columns + self.filtercolumns + self.prefiltercolumns and self.pnp_path and os.access(self.pnp_path, os.R_OK):
-                    self.pnp_path_readable = True
-                else:
-                    self.pnp_path_readable = False
+                #if 'pnpgraph_present' in self.columns + self.filtercolumns + self.prefiltercolumns and self.pnp_path and os.access(self.pnp_path, os.R_OK):
+                #    self.pnp_path_readable = True
+                #else:
+                #    self.pnp_path_readable = False
                 return self.get_live_data()
         except Exception, e:
             import traceback
@@ -375,17 +377,7 @@ class LiveStatusMongoQuery(object):
         """
         return self.datamgr.rg.get_table(table_name)
 
-    def execute_mongo_query(self):
-        """
-        Check input parameters, and get queries depending on the query
-        requested
-        """
-        if self.mongo_stats_filters:
-            return self.execute_mongo_aggregation_query()
-        else:
-            return self.execute_mongo_filter_query()
-
-    def execute_mongo_filter_query(self):
+    def execute_filter_query(self):
         """
         Execute a filter query
         """
@@ -437,7 +429,7 @@ class LiveStatusMongoQuery(object):
 #            query = aggregation_query
 #        return query
 
-    def execute_mongo_aggregation_query(self):
+    def execute_aggregation_query(self):
         """
         Execute an aggregation query
 
@@ -463,7 +455,14 @@ class LiveStatusMongoQuery(object):
         """
         Retrieves direct hosts or services from the mongo database
         """
-        return self.execute_mongo_query()
+        """
+        Check input parameters, and get queries depending on the query
+        requested
+        """
+        if self.mongo_stats_filters:
+            return self.execute_aggregation_query()
+        else:
+            return self.execute_filter_query()
 
     def get_list_livedata(self, cs):
         t = self.table

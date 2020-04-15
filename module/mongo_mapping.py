@@ -39,20 +39,20 @@ class Problem:
 
 
 def modified_attributes_names(self):
-    names_list = set()
+    names_list = set(),
 
     for attr in DICT_MODATTR:
         if self.modified_attributes & DICT_MODATTR[attr].value:
-            names_list.add(DICT_MODATTR[attr].attribute)
-    return list(names_list)
+            names_list.add(DICT_MODATTR[attr].attribute),
+    return list(names_list),
 
 
 def join_with_separators(request, *args):
     if request.response.outputformat == 'csv':
         try:
-            return request.response.separators.pipe.join([str(arg) for arg in args])
+            return request.response.separators.pipe.join([str(arg) for arg in args]),
         except Exception, e:
-            logger.error("[Livestatus Broker Mapping] Bang Error: %s" % e)
+            logger.error("[Livestatus Broker Mapping] Bang Error: %s" % e),
     elif request.response.outputformat == 'json' or request.response.outputformat == 'python':
         return args
     else:
@@ -89,8 +89,8 @@ def find_pnp_perfdata_xml(name, request):
             # It is a service
 
             # replace space, colon, slash and backslash to be PNP compliant
-            name = name.split('/', 1)
-            name[1] = re.sub(r'[ :\/\\]', '_', name[1])
+            name = name.split('/', 1),
+            name[1] = re.sub(r'[ :\/\\]', '_', name[1]),
 
             if os.access(request.pnp_path + '/' + '/'.join(name) + '.xml', os.R_OK):
                 return 1
@@ -107,9 +107,9 @@ def from_svc_hst_distinct_lists(dct):
     t = []
     for item in dct:
         try:
-            t.append(item.get_full_name())
+            t.append(item.get_full_name()),
         except Exception:
-            t.append(item.get_name())
+            t.append(item.get_name()),
     return t
 
 
@@ -143,9 +143,9 @@ def state_count(item, table, state_type_id=None, state_id=None):
     the input parameters.
 
     :param dict item: The item to get services for
-    :param int state_type_id: The service state type id (0/1)
+    :param int state_type_id: The service state type id (0/1),
     :param int/str item: The service state id (0, 1, 2, or OK, WARN, CRIT,
-                         UNKNOWN, PENDING)
+                         UNKNOWN, PENDING),
     :rtype: int
     :return: The number of matching services
     """
@@ -191,7 +191,7 @@ def state_worst(item, table, state_type_id=None):
 
     :param str table: The table to for states
     :param dict item: The item to get services for
-    :param int state_type_id: The service state type id (0/1)
+    :param int state_type_id: The service state type id (0/1),
     :rtype: int
     :return: The worst service state id
     """
@@ -216,6 +216,20 @@ def state_worst(item, table, state_type_id=None):
         pprint(item)
         raise
 
+
+def linked_host_attr(item, attr, default=""):
+    """
+    Returnrs the linked host attribute value, or default if it does not exist
+
+    :param dict item: The item to read attribute from
+    :param str attr: The attribute name to read
+    :param mixed defaut: The default value
+    """
+    if item.get("host"):
+        return item["host"][0].get(attr, default)
+    else:
+        return default
+
 # description (optional): no need to explain this
 # prop (optional): the property of the object. If this is missing, the key is the property
 # type (mandatory): int, float, string, list
@@ -225,8 +239,8 @@ def state_worst(item, table, state_type_id=None):
 # as: use it together with delegate, if the property of the other object has another name
 
 # description
-# function: a lambda with 2 parameters (host/service/comment.., request)
-# repr: the datatype returned by the lambda (bool, int, string, list)
+# function: a lambda with 2 parameters (host/service/comment.., request),
+# repr: the datatype returned by the lambda (bool, int, string, list),
 #       this is needed for filters. lsl query attributes are converted to this datatype
 #       later, the repr datatype needs to be converted to a string
 
@@ -242,7 +256,7 @@ livestatus_attribute_map = {
         },
         'acknowledged': {
             'description': 'Whether the current host problem has been acknowledged (0/1)',
-            'function': lambda item: item["problem_has_been_acknowledged"],
+            'function': lambda item: item.get("problem_has_been_acknowledged", False),
             'datatype': bool,
             'filters': {
                 'attr': 'problem_has_been_acknowledged',
@@ -250,7 +264,7 @@ livestatus_attribute_map = {
         },
         'acknowledgement_type': {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
-            'function': lambda item: item["acknowledgement_type"],
+            'function': lambda item: item.get("acknowledgement_type", 0),
             'datatype': int,
         },
         'action_url': {
@@ -302,7 +316,7 @@ livestatus_attribute_map = {
         },
         'check_options': {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: 0,  #FIXME
             'datatype': int,
         },
         'check_period': {
@@ -324,12 +338,12 @@ livestatus_attribute_map = {
         },
         'child_dependencies': {
             'description': 'List of the host/service that depend on this host (logical, network or business one).',
-            'function': lambda item: item["child_dependencies"],
+            'function': lambda item: item.get("child_dependencies", []),
             'datatype': list,
         },
         'childs': {
             'description': 'A list of all direct childs of the host',
-            'function': lambda item: item["childs"],
+            'function': lambda item: item.get("childs", []),
             'datatype': list,
             'filters': {},
         },
@@ -371,7 +385,7 @@ livestatus_attribute_map = {
         },
         'current_notification_number': {
             'description': 'Number of the current notification',
-            'function': lambda item: item["current_notification_number"],
+            'function': lambda item: item.get("current_notification_number", 0),
             'datatype': int,
         },
         'custom_variable_names': {
@@ -424,13 +438,12 @@ livestatus_attribute_map = {
         },
         'execution_time': {
             'description': 'Time the host check needed for execution',
-            'function': lambda item: item["execution_time"],
+            'function': lambda item: item.get("execution_time", 0),
             'datatype': float,
         },
         'filename': {
             'description': 'The value of the custom variable FILENAME',
             'function': lambda item: '', #FIXME
-            'datatype': str,
             'projections': [],
             'filters': {},
         },
@@ -459,12 +472,12 @@ livestatus_attribute_map = {
         },
         'hard_state': {
             'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: 0,  #FIXME
             'datatype': int,
         },
         'has_been_checked': {
             'description': 'Whether the host has already been checked (0/1)',
-            'function': lambda item: item["has_been_checked"],
+            'function': lambda item: item.get("has_been_checked", 0),
             'datatype': int,
         },
         'high_flap_threshold': {
@@ -492,7 +505,7 @@ livestatus_attribute_map = {
         },
         'impacts': {
             'description': 'List of what the source impact (list of hosts and services)',
-            'function': lambda item: item["impacts"],  # REPAIRME MAYBE (separators in python and csv)
+            'function': lambda item: item.get("impacts", []),  # REPAIRME MAYBE (separators in python and csv),
             'datatype': list,
             'filters': {},
         },
@@ -513,7 +526,6 @@ livestatus_attribute_map = {
         'initial_state': {
             'description': 'Initial host state',
             'function': lambda item: item["initial_state"],
-            'datatype': int,
         },
         'is_executing': {
             'description': 'is there a host check currently running... (0/1)',
@@ -524,17 +536,17 @@ livestatus_attribute_map = {
         },
         'is_flapping': {
             'description': 'Whether the host state is flapping (0/1)',
-            'function': lambda item: item["is_flapping"],
+            'function': lambda item: item.get("is_flapping", False),
             'datatype': bool,
         },
         'is_impact': {
             'description': 'Whether the host state is an impact or not (0/1)',
-            'function': lambda item: item["is_impact"],
+            'function': lambda item: item.get("is_impact", False),
             'datatype': bool,
         },
         'is_problem': {
             'description': 'Whether the host state is a problem or not (0/1)',
-            'function': lambda item: item["is_problem"],
+            'function': lambda item: item.get("is_problem", False),
             'datatype': bool,
         },
         'labels': {
@@ -544,7 +556,7 @@ livestatus_attribute_map = {
         },
         'last_check': {
             'description': 'Time of the last check (Unix timestamp)',
-            'function': lambda item: int(item["last_chk"]),
+            'function': lambda item: item.get("last_chk", 0),
             'datatype': int,
             'filters': {
                 'attr': 'last_chk',
@@ -552,7 +564,7 @@ livestatus_attribute_map = {
         },
         'last_hard_state': {
             'description': 'Last hard state',
-            'function': lambda item: item["last_hard_state_id"],
+            'function': lambda item: item.get("last_hard_state_id", 0),
             'datatype': int,
             'filters': {
                 'attr': 'last_hard_state_id',
@@ -561,64 +573,63 @@ livestatus_attribute_map = {
         },
         'last_hard_state_change': {
             'description': 'Time of the last hard state change (Unix timestamp)',
-            'function': lambda item: item["last_hard_state_change"],
+            'function': lambda item: item.get("last_hard_state_change", 0),
             'datatype': int,
         },
         'last_notification': {
             'description': 'Time of the last notification (Unix timestamp)',
-            'function': lambda item: item["last_notification"],
+            'function': lambda item: item.get("last_notification", 0),
             'datatype': int,
         },
         'last_state': {
             'description': 'State before last state change',
-            'function': lambda item: item["last_state"],
-            'datatype': int,
+            'function': lambda item: item.get("last_state", ""),
         },
         'last_state_change': {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
-            'function': lambda item: item["last_state_change"],
+            'function': lambda item: item.get("last_state_change", 0),
             'datatype': int,
         },
         'last_time_down': {
             'description': 'The last time the host was DOWN (Unix timestamp)',
-            'function': lambda item: item["last_time_down"],  # REPAIRME
+            'function': lambda item: item.get("last_time_down", 0),  # REPAIRME
             'datatype': int,
         },
         'last_time_unreachable': {
             'description': 'The last time the host was UNREACHABLE (Unix timestamp)',
-            'function': lambda item: item["last_time_unreachable"],  # REPAIRME
+            'function': lambda item: item.get("last_time_unreachable", 0),  # REPAIRME
             'datatype': int,
         },
         'last_time_up': {
             'description': 'The last time the host was UP (Unix timestamp)',
-            'function': lambda item: item["last_time_up"],  # REPAIRME
+            'function': lambda item: item.get("last_time_up", 0),  # REPAIRME
             'datatype': int,
         },
         'latency': {
             'description': 'Time difference between scheduled check time and actual check time',
-            'function': lambda item: item["latency"],
+            'function': lambda item: item.get("latency", 0),
             'datatype': float,
         },
         'long_plugin_output': {
             'description': 'Complete output from check plugin',
-            'function': lambda item: item["long_output"],
+            'function': lambda item: item.get("long_output", ""),
             'filters': {
                 'attr': 'long_output',
             },
         },
         'low_flap_threshold': {
             'description': 'Low threshold of flap detection',
-            'function': lambda item: item["low_flap_threshold"],
+            'function': lambda item: item.get("low_flap_threshold", 0),
             'datatype': float,
         },
         'max_check_attempts': {
             'description': 'Max check attempts for active host checks',
-            'function': lambda item: item["max_check_attempts"],
+            'function': lambda item: item.get("max_check_attempts", 0),
             'datatype': int,
         },
         'modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
-            'function': lambda item: item["modified_attributes"],  # CONTROLME
+            'function': lambda item: item.get("modified_attributes", 0),  # CONTROLME
             'datatype': int,
         },
         'modified_attributes_list': {
@@ -635,7 +646,7 @@ livestatus_attribute_map = {
         },
         'next_check': {
             'description': 'Scheduled time for the next check (Unix timestamp)',
-            'function': lambda item: item["next_chk"],
+            'function': lambda item: item.get("next_chk", 0),
             'datatype': int,
             'filters': {
                 'attr': 'next_chk',
@@ -643,7 +654,7 @@ livestatus_attribute_map = {
         },
         'next_notification': {
             'description': 'Time of the next notification (Unix timestamp)',
-            'function': lambda item: int(item.last_notification + item.notification_interval * item.__class__.interval_length),  # CONTROLME
+            'function': lambda item: 0, #FIXME
             'datatype': int,
         },
         'notes': {
@@ -687,7 +698,7 @@ livestatus_attribute_map = {
         },
         'no_more_notifications': {
             'description': 'Whether to stop sending notifications (0/1)',
-            'function': lambda item: item["no_more_notifications"],  # REPAIRME, maybe ask both instance and class
+            'function': lambda item: item.get("no_more_notifications", False),  # REPAIRME, maybe ask both instance and class
             'datatype': bool,
         },
         'obsess_over_host': {
@@ -697,33 +708,33 @@ livestatus_attribute_map = {
         },
         'parent_dependencies': {
             'description': 'List of the dependencies (logical, network or business one) of this host.',
-            'function': lambda item: item["parent_dependencies"],
+            'function': lambda item: item.get("parent_dependencies", []),
             'datatype': list,
             'filters': {},
         },
         'parents': {
             'description': 'A list of all direct parents of the host',
-            'function': lambda item: item["parents"],
+            'function': lambda item: item.get("parents", []),
             'datatype': list,
             'filters': {},
         },
         'pending_flex_downtime': {
             'description': 'Whether a flex downtime is pending (0/1)',
-            'function': lambda item: item["pending_flex_downtime"],
+            'function': lambda item: item.get("pending_flex_downtime", 0),
             'datatype': int,
         },
         'percent_state_change': {
             'description': 'Percent state change',
-            'function': lambda item: item["percent_state_change"],
+            'function': lambda item: item.get("percent_state_change", 0),
             'datatype': float,
         },
         'perf_data': {
             'description': 'Optional performance data of the last host check',
-            'function': lambda item: item["perf_data"],
+            'function': lambda item: item.get("perf_data", ""),
         },
         'plugin_output': {
             'description': 'Output of the last host check',
-            'function': lambda item: item["output"],
+            'function': lambda item: item.get("output", ""),
             'filters': {
                 'attr': 'output',
             },
@@ -735,14 +746,13 @@ livestatus_attribute_map = {
             'projections': [],
             'filters': {},
         },
-        'poller_tag': {
-            'description': 'Poller Tag',
-            'function': lambda item: item["poller_tag"],
-        },
         'process_performance_data': {
             'description': 'Whether processing of performance data is enabled (0/1)',
             'function': lambda item: item["process_perf_data"],
             'datatype': bool,
+            'filters': {
+                'attr': 'process_perf_data',
+            },
         },
         'realm': {
             'description': 'Realm',
@@ -755,12 +765,12 @@ livestatus_attribute_map = {
         },
         'scheduled_downtime_depth': {
             'description': 'The number of downtimes this host is currently in',
-            'function': lambda item: item["scheduled_downtime_depth"],
+            'function': lambda item: item.get("scheduled_downtime_depth", 0),
             'datatype': int,
         },
         'services': {
             'description': 'A list of all services of the host',
-            'function': lambda item: item["services"],
+            'function': lambda item: item.get("services", []),
             'datatype': list,
             'projections': ['services.service_description'],
             'filters': {},
@@ -779,7 +789,7 @@ livestatus_attribute_map = {
         },
         'services_with_state': {
             'description': 'A list of all services of the host together with state and has_been_checked',
-            'function': lambda item: [join_with_separators(req, x.get_name(), x.state_id, x.has_been_checked) for x in item.services],
+            'function': lambda item: [], #FIXME
             'datatype': list,
             'projections': [
                 'services.service_description',
@@ -790,12 +800,12 @@ livestatus_attribute_map = {
         },
         'source_problems': {
             'description': 'The name of the source problems (host or service)',
-            'function': lambda item: item["source_problems"],  # REPAIRME MAYBE (separators in python and csv)
+            'function': lambda item: item.get("source_problems", []),  # REPAIRME MAYBE (separators in python and csv),
             'datatype': list,
         },
         'state': {
             'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
-            'function': lambda item: item["state_id"],
+            'function': lambda item: item.get("state_id", 0),
             'datatype': int,
             'filters': {
                 'attr': 'state_id',
@@ -803,7 +813,7 @@ livestatus_attribute_map = {
         },
         'state_type': {
             'description': 'Type of the current state (0: soft, 1: hard)',
-            'function': lambda item: item["state_type_id"],
+            'function': lambda item: item.get("state_type_id", 0),
             'datatype': int,
             'filters': {
                 'attr': 'state_type_id',
@@ -820,7 +830,7 @@ livestatus_attribute_map = {
         },
         'total_services': {
             'description': 'The total number of services of the host',
-            'function': lambda item: len(item["services"]),
+            'function': lambda item: len(item.get("services", [])),
             'datatype': int,
             'projections': ['services.service_description'],
             'filters': {},
@@ -844,7 +854,7 @@ livestatus_attribute_map = {
     'HostLink': {
         'host_accept_passive_checks': {
             'description': 'Whether passive host checks are accepted (0/1)',
-            'function': lambda item: item["host"]["problem_has_been_acknowledged"],
+            'function': lambda item: linked_host_attr(item, "passive_checks_enabled", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.passive_checks_enabled',
@@ -852,7 +862,7 @@ livestatus_attribute_map = {
         },
         'host_acknowledged': {
             'description': 'Whether the current host problem has been acknowledged (0/1)',
-            'function': lambda item: item["host"]["problem_has_been_acknowledged"],
+            'function': lambda item: linked_host_attr(item, "problem_has_been_acknowledged", False),
             'datatype': bool,
             'filters': {
                 'attr': 'host.problem_has_been_acknowledged',
@@ -860,7 +870,7 @@ livestatus_attribute_map = {
         },
         'host_acknowledgement_type': {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
-            'function': lambda item: item["host"]["acknowledgement_type"],
+            'function': lambda item: linked_host_attr(item, "acknowledgement_type", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.acknowledgement_type',
@@ -868,7 +878,7 @@ livestatus_attribute_map = {
         },
         'host_action_url': {
             'description': 'An optional URL to custom actions or information about this host',
-            'function': lambda item: item["host"]["action_url"],
+            'function': lambda item: linked_host_attr(item, "action_url", ""),
             'filters': {
                 'attr': 'host.action_url',
             },
@@ -881,28 +891,29 @@ livestatus_attribute_map = {
         },
         'host_active_checks_enabled': {
             'description': 'Whether active checks are enabled for the host (0/1)',
-            'function': lambda item: item["host"]["active_checks_enabled"],
+            'function': lambda item: linked_host_attr(item, "active_checks_enabled", True),
+            'datatype': bool,
             'filters': {
                 'attr': 'host.active_checks_enabled',
             },
         },
         'host_address': {
             'description': 'IP address',
-            'function': lambda item: item["host"]["address"],
+            'function': lambda item: linked_host_attr(item, "address"),
             'filters': {
                 'attr': 'host.address',
             },
         },
         'host_alias': {
             'description': 'An alias name for the host',
-            'function': lambda item: item["host"]["alias"],
+            'function': lambda item: linked_host_attr(item, "alias"),
             'filters': {
                 'attr': 'host.alias',
             },
         },
         'host_check_command': {
             'description': 'Nagios command used for active checks',
-            'function': lambda item: item["host"]["check_command"],
+            'function': lambda item: linked_host_attr(item, "check_command"),
             'filters': {
                 'attr': 'host.check_command',
             },
@@ -917,7 +928,7 @@ livestatus_attribute_map = {
         },
         'host_check_freshness': {
             'description': 'Whether freshness checks are activated (0/1)',
-            'function': lambda item: item["host"]["check_freshness"],
+            'function': lambda item: linked_host_attr(item, "check_freshness", False),
             'datatype': bool,
             'filters': {
                 'attr': 'host.check_freshness',
@@ -925,7 +936,7 @@ livestatus_attribute_map = {
         },
         'host_check_interval': {
             'description': 'Number of basic interval lengths between two scheduled checks of the host',
-            'function': lambda item: item["host"]["check_interval"],
+            'function': lambda item: linked_host_attr(item, "check_interval", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.check_interval',
@@ -933,16 +944,16 @@ livestatus_attribute_map = {
         },
         'host_check_options': {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
-            'function': lambda item: item["host"]["alias"],
+            'function': lambda item: linked_host_attr(item, "check_options"),
             'filters': {
-                'attr': 'host.alias',
+                'attr': 'host.check_options',
             },
         },
         'host_check_period': {
             'description': 'Time period in which this host will be checked. If empty then the host will always be checked.',
-            'function': lambda item: item["host"]["alias"],
+            'function': lambda item: linked_host_attr(item, "check_period"),
             'filters': {
-                'attr': 'host.alias',
+                'attr': 'host.period',
             },
         },
         'host_check_type': {
@@ -954,22 +965,22 @@ livestatus_attribute_map = {
         },
         'host_checks_enabled': {
             'description': 'Whether active checks of the host are enabled (0/1)',
-            'function': lambda item: item["host"]["checks_enabled"],
+            'function': lambda item: linked_host_attr(item, "active_checks_enabled", True),
             'datatype': bool,
             'filters': {
-                'attr': 'host.checks_enabled',
+                'attr': 'host.active_checks_enabled',
             },
         },
         'host_childs': {
             'description': 'A list of all direct childs of the host',
-            'function': lambda item: item["host"]["childs"],
+            'function': lambda item: linked_host_attr(item, "childs", []),
             'datatype': list,
             'projections': ['host.childs'],
             'filters': {},
         },
         'host_comments': {
             'description': 'A list of the ids of all comments of this host',
-            'function': lambda item: item["host"]["comments"],
+            'function': lambda item: linked_host_attr(item, "comments", []),
             'datatype': list,
             'filters': {
                 'attr': 'host.comments',
@@ -984,7 +995,7 @@ livestatus_attribute_map = {
         },
         'host_contacts': {
             'description': 'A list of all contacts of this host, either direct or via a contact group',
-            'function': lambda item: item["host"]["contacts"],
+            'function': lambda item: linked_host_attr(item, "contacts", []),
             'datatype': list,
             'filters': {
                 'attr': 'host.contacts',
@@ -992,7 +1003,7 @@ livestatus_attribute_map = {
         },
         'host_contact_groups': {
             'description': 'A list of all contact groups this host is in',
-            'function': lambda item: item["host"]["contact_groups"],
+            'function': lambda item: linked_host_attr(item, "contact_groups", []),
             'datatype': list,
             'filters': {
                 'attr': 'host.contact_groups',
@@ -1000,7 +1011,7 @@ livestatus_attribute_map = {
         },
         'host_current_attempt': {
             'description': 'Number of the current check attempts',
-            'function': lambda item: item["host"]["attempt"],
+            'function': lambda item: linked_host_attr(item, "attempt", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.attempt',
@@ -1008,7 +1019,7 @@ livestatus_attribute_map = {
         },
         'host_current_notification_number': {
             'description': 'Number of the current notification',
-            'function': lambda item: item["host"]["current_notification_number"],
+            'function': lambda item: linked_host_attr(item, "current_notification_number", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.current_notification_number',
@@ -1037,7 +1048,7 @@ livestatus_attribute_map = {
         },
         'host_display_name': {
             'description': 'Optional display name of the host - not used by Nagios\' web interface',
-            'function': lambda item: item["host"]["display_name"],
+            'function': lambda item: linked_host_attr(item, "display_name"),
             'filters': {
                 'attr': 'host.display_name',
             },
@@ -1059,14 +1070,14 @@ livestatus_attribute_map = {
         },
         'host_event_handler': {
             'description': 'Nagios command used as event handler of this host',
-            'function': lambda item: item["host"]["event_handler"],
+            'function': lambda item: linked_host_attr(item, "event_handler"),
             'filters': {
                 'attr': 'host.event_handler',
             },
         },
         'host_event_handler_enabled': {
             'description': 'Whether event handling is enabled for the host (0/1)',
-            'function': lambda item: item["host"]["event_handler_enabled"],
+            'function': lambda item: linked_host_attr(item, "event_handler_enabled", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.event_handler_enabled',
@@ -1074,7 +1085,7 @@ livestatus_attribute_map = {
         },
         'host_execution_time': {
             'description': 'Time the host check needed for execution',
-            'function': lambda item: item["host"]["execution_time"],
+            'function': lambda item: linked_host_attr(item, "execution_time", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.execution_time',
@@ -1088,7 +1099,7 @@ livestatus_attribute_map = {
         },
         'host_first_notification_delay': {
             'description': 'Delay before the first notification',
-            'function': lambda item: item["host"]["first_notification_delay"],
+            'function': lambda item: linked_host_attr(item, "first_notification_delay", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.first_notification_delay',
@@ -1096,7 +1107,7 @@ livestatus_attribute_map = {
         },
         'host_flap_detection_enabled': {
             'description': 'Whether flap detection is enabled (0/1)',
-            'function': lambda item: item["host"]["flap_detection_enabled"],
+            'function': lambda item: linked_host_attr(item, "flap_detection_enabled", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.flap_detection_enabled',
@@ -1104,7 +1115,7 @@ livestatus_attribute_map = {
         },
         'host_groups': {
             'description': 'A list of all host groups this host is in',
-            'function': lambda item: item["host"]["hostgroups"],
+            'function': lambda item: linked_host_attr(item, "hostgroups", []),
             'datatype': list,
             'filters': {
                 'attr': 'host.hostgroups',
@@ -1112,7 +1123,7 @@ livestatus_attribute_map = {
         },
         'host_hard_state': {
             'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
-            'function': lambda item: item["host"]["hard_state"],
+            'function': lambda item: linked_host_attr(item, "hard_state", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.hard_state',
@@ -1120,7 +1131,7 @@ livestatus_attribute_map = {
         },
         'host_has_been_checked': {
             'description': 'Whether the host has already been checked (0/1)',
-            'function': lambda item: item["host"]["has_been_checked"],
+            'function': lambda item: linked_host_attr(item, "has_been_checked", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.has_been_checked',
@@ -1128,7 +1139,7 @@ livestatus_attribute_map = {
         },
         'host_high_flap_threshold': {
             'description': 'High threshold of flap detection',
-            'function': lambda item: item["host"]["high_flap_threshold"],
+            'function': lambda item: linked_host_attr(item, "high_flap_threshold", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.high_flap_threshold',
@@ -1136,14 +1147,14 @@ livestatus_attribute_map = {
         },
         'host_icon_image': {
             'description': 'The name of an image file to be used in the web pages',
-            'function': lambda item: item["host"]["icon_image"],
+            'function': lambda item: linked_host_attr(item, "icon_image"),
             'filters': {
                 'attr': 'host.icon_image',
             },
         },
         'host_icon_image_alt': {
             'description': 'Alternative text for the icon_image',
-            'function': lambda item: item["host"]["icon_image_alt"],
+            'function': lambda item: linked_host_attr(item, "icon_image_alt"),
             'filters': {
                 'attr': 'host.icon_image_alt',
             },
@@ -1170,7 +1181,7 @@ livestatus_attribute_map = {
         },
         'host_initial_state': {
             'description': 'Initial host state',
-            'function': lambda item: item["host"]["initial_state"],
+            'function': lambda item: linked_host_attr(item, "initial_state"),
             'datatype': int,
             'filters': {
                 'attr': 'host.initial_state',
@@ -1184,7 +1195,7 @@ livestatus_attribute_map = {
         },
         'host_is_flapping': {
             'description': 'Whether the host state is flapping (0/1)',
-            'function': lambda item: item["host"]["is_flapping"],
+            'function': lambda item: linked_host_attr(item, "is_flapping", False),
             'datatype': bool,
             'filters': {
                 'attr': 'host.is_flapping',
@@ -1192,7 +1203,7 @@ livestatus_attribute_map = {
         },
         'host_last_check': {
             'description': 'Time of the last check (Unix timestamp)',
-            'function': lambda item: item["host"]["last_chk"],
+            'function': lambda item: linked_host_attr(item, "last_chk", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_chk',
@@ -1200,7 +1211,7 @@ livestatus_attribute_map = {
         },
         'host_last_hard_state': {
             'description': 'Last hard state',
-            'function': lambda item: item["host"]["last_hard_state_id"],
+            'function': lambda item: linked_host_attr(item, "last_hard_state_id", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_hard_state_id',
@@ -1208,7 +1219,7 @@ livestatus_attribute_map = {
         },
         'host_last_hard_state_change': {
             'description': 'Time of the last hard state change (Unix timestamp)',
-            'function': lambda item: item["host"]["last_hard_state_change"],
+            'function': lambda item: linked_host_attr(item, "last_hard_state_change", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_hard_state_change',
@@ -1216,7 +1227,7 @@ livestatus_attribute_map = {
         },
         'host_last_notification': {
             'description': 'Time of the last notification (Unix timestamp)',
-            'function': lambda item: item["host"]["last_notification"],
+            'function': lambda item: linked_host_attr(item, "last_notification", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_notification',
@@ -1224,15 +1235,14 @@ livestatus_attribute_map = {
         },
         'host_last_state': {
             'description': 'State before last state change',
-            'function': lambda item: item["host"]["last_state"],
-            'datatype': int,
+            'function': lambda item: linked_host_attr(item, "last_state"),
             'filters': {
                 'attr': 'host.last_state',
             },
         },
         'host_last_state_change': {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
-            'function': lambda item: item["host"]["last_state_change"],
+            'function': lambda item: linked_host_attr(item, "last_state_change", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_state_change',
@@ -1240,7 +1250,7 @@ livestatus_attribute_map = {
         },
         'host_last_time_down': {
             'description': 'The last time the host was DOWN (Unix timestamp)',
-            'function': lambda item: item["host"]["last_time_down"],
+            'function': lambda item: linked_host_attr(item, "last_time_down", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_time_down',
@@ -1248,7 +1258,7 @@ livestatus_attribute_map = {
         },
         'host_last_time_unreachable': {
             'description': 'The last time the host was UNREACHABLE (Unix timestamp)',
-            'function': lambda item: item["host"]["last_time_unreachable"],
+            'function': lambda item: linked_host_attr(item, "last_time_unreachable", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_time_unreachable',
@@ -1256,7 +1266,7 @@ livestatus_attribute_map = {
         },
         'host_last_time_up': {
             'description': 'The last time the host was UP (Unix timestamp)',
-            'function': lambda item: item["host"]["last_time_up"],
+            'function': lambda item: linked_host_attr(item, "last_time_up", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.last_time_up',
@@ -1264,7 +1274,7 @@ livestatus_attribute_map = {
         },
         'host_latency': {
             'description': 'Time difference between scheduled check time and actual check time',
-            'function': lambda item: item["host"]["latency"],
+            'function': lambda item: linked_host_attr(item, "latency", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.latency',
@@ -1272,14 +1282,14 @@ livestatus_attribute_map = {
         },
         'host_long_plugin_output': {
             'description': 'Complete output from check plugin',
-            'function': lambda item: item["host"]["long_output"],
+            'function': lambda item: linked_host_attr(item, "long_output"),
             'filters': {
                 'attr': 'host.long_output',
             },
         },
         'host_low_flap_threshold': {
             'description': 'Low threshold of flap detection',
-            'function': lambda item: item["host"]["low_flap_threshold"],
+            'function': lambda item: linked_host_attr(item, "low_flap_threshold", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.low_flap_threshold',
@@ -1287,7 +1297,7 @@ livestatus_attribute_map = {
         },
         'host_max_check_attempts': {
             'description': 'Max check attempts for active host checks',
-            'function': lambda item: item["host"]["max_checks_attempts"],
+            'function': lambda item: linked_host_attr(item, "max_checks_attempts", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.max_checks_attempts',
@@ -1295,7 +1305,7 @@ livestatus_attribute_map = {
         },
         'host_modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
-            'function': lambda item: len(item["host"]["modified_attributes"]),
+            'function': lambda item: 0, #FIXME
             'datatype': int,
             'filters': {
                 'attr': 'host.modified_attributes',
@@ -1313,7 +1323,7 @@ livestatus_attribute_map = {
         },
         'host_next_check': {
             'description': 'Scheduled time for the next check (Unix timestamp)',
-            'function': lambda item: item["host"]["alias"],
+            'function': lambda item: linked_host_attr(item, "next_chk", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.next_chk',
@@ -1327,7 +1337,7 @@ livestatus_attribute_map = {
         },
         'host_notes': {
             'description': 'Optional notes about the service',
-            'function': lambda item: item["host"]["notes"],
+            'function': lambda item: linked_host_attr(item, "notes"),
             'filters': {
                 'attr': 'host.notes',
             },
@@ -1339,7 +1349,7 @@ livestatus_attribute_map = {
         },
         'host_notes_url': {
             'description': 'An optional URL with further information about the host',
-            'function': lambda item: item["host"]["notes_url"],
+            'function': lambda item: linked_host_attr(item, "notes_url"),
             'filters': {
                 'attr': 'host.notes_url',
             },
@@ -1351,7 +1361,7 @@ livestatus_attribute_map = {
         },
         'host_notification_interval': {
             'description': 'Interval of periodic notification or 0 if its off',
-            'function': lambda item: item["host"]["notification_interval"],
+            'function': lambda item: linked_host_attr(item, "notification_interval", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.notification_interval',
@@ -1359,14 +1369,14 @@ livestatus_attribute_map = {
         },
         'host_notification_period': {
             'description': 'Time period in which problems of this host will be notified. If empty then notification will be always',
-            'function': lambda item: item["host"]["notification_period"],
+            'function': lambda item: linked_host_attr(item, "notification_period"),
             'filters': {
                 'attr': 'host.notification_period',
             },
         },
         'host_notifications_enabled': {
             'description': 'Whether notifications of the host are enabled (0/1)',
-            'function': lambda item: item["host"]["notifications_enabled"],
+            'function': lambda item: linked_host_attr(item, "notifications_enabled", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.notifications_enabled',
@@ -1374,7 +1384,7 @@ livestatus_attribute_map = {
         },
         'host_no_more_notifications': {
             'description': 'Whether to stop sending notifications (0/1)',
-            'function': lambda item: item["host"]["no_more_notifications"],
+            'function': lambda item: linked_host_attr(item, "no_more_notifications", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.no_more_notifications',
@@ -1448,15 +1458,15 @@ livestatus_attribute_map = {
         },
         'host_parents': {
             'description': 'A list of all direct parents of the host',
-            'function': lambda item: item["host"]["alias"],
+            'function': lambda item: linked_host_attr(item, "alias", []),
             'datatype':list,
             'filters': {
-                'attr': 'host.alias',
+                'attr': 'host.parents',
             },
         },
         'host_pending_flex_downtime': {
             'description': 'Whether a flex downtime is pending (0/1)',
-            'function': lambda item: item["host"]["pending_flex_downtimes"],
+            'function': lambda item: linked_host_attr(item, "pending_flex_downtimes", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.pending_flex_downtimes',
@@ -1464,7 +1474,7 @@ livestatus_attribute_map = {
         },
         'host_percent_state_change': {
             'description': 'Percent state change',
-            'function': lambda item: item["host"]["percent_state_change"],
+            'function': lambda item: linked_host_attr(item, "percent_state_change", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.percent_state_change',
@@ -1472,14 +1482,14 @@ livestatus_attribute_map = {
         },
         'host_perf_data': {
             'description': 'Optional performance data of the last host check',
-            'function': lambda item: item["host"]["perf_data"],
+            'function': lambda item: linked_host_attr(item, "perf_data"),
             'filters': {
                 'attr': 'host.perf_data',
             },
         },
         'host_plugin_output': {
             'description': 'Output of the last host check',
-            'function': lambda item: item["host"]["output"],
+            'function': lambda item: linked_host_attr(item, "output"),
             'filters': {
                 'attr': 'host.output',
             },
@@ -1492,7 +1502,7 @@ livestatus_attribute_map = {
         },
         'host_process_performance_data': {
             'description': 'Whether processing of performance data is enabled (0/1)',
-            'function': lambda item: item["host"]["process_performances_data"],
+            'function': lambda item: linked_host_attr(item, "process_performances_data", True),
             'datatype': bool,
             'filters': {
                 'attr': 'host.process_performances_data',
@@ -1500,7 +1510,7 @@ livestatus_attribute_map = {
         },
         'host_retry_interval': {
             'description': 'Number of basic interval lengths between checks when retrying after a soft error',
-            'function': lambda item: item["host"]["retry_interval"],
+            'function': lambda item: linked_host_attr(item, "retry_interval", 0),
             'datatype': float,
             'filters': {
                 'attr': 'host.retry_interval',
@@ -1508,7 +1518,7 @@ livestatus_attribute_map = {
         },
         'host_scheduled_downtime_depth': {
             'description': 'The number of downtimes this host is currently in',
-            'function': lambda item: item["host"]["scheduled_downtime_depth"],
+            'function': lambda item: linked_host_attr(item, "scheduled_downtime_depth", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.scheduled_downtime_depth',
@@ -1534,7 +1544,7 @@ livestatus_attribute_map = {
         },
         'host_state': {
             'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
-            'function': lambda item: item["host"]["state_id"],
+            'function': lambda item: linked_host_attr(item, "state_id", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.state_id',
@@ -1542,7 +1552,7 @@ livestatus_attribute_map = {
         },
         'host_state_type': {
             'description': 'Type of the current state (0: soft, 1: hard)',
-            'function': lambda item: item["host"]["state_type_id"],
+            'function': lambda item: linked_host_attr(item, "state_type_id", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.state_type_id',
@@ -1550,14 +1560,14 @@ livestatus_attribute_map = {
         },
         'host_statusmap_image': {
             'description': 'The name of in image file for the status map',
-            'function': lambda item: item["host"]["statusmap_image"],
+            'function': lambda item: linked_host_attr(item, "statusmap_image"),
             'filters': {
                 'attr': 'host.statusmap_image',
             },
         },
         'host_tags': {
             'description': 'The list of Host Tags',
-            'function': lambda item: item["host"]["tags"],
+            'function': lambda item: linked_host_attr(item, "tags", []),
             'datatype': list,
             'filters': {
                 'attr': 'host.tags',
@@ -1583,7 +1593,7 @@ livestatus_attribute_map = {
         },
         'host_x_3d': {
             'description': '3D-Coordinates: X',
-            'function': lambda item: item["host"]["x_3d"],
+            'function': lambda item: linked_host_attr(item, "x_3d"),
             'datatype': float,
             'filters': {
                 'attr': 'host.x_3d',
@@ -1591,7 +1601,7 @@ livestatus_attribute_map = {
         },
         'host_y_3d': {
             'description': '3D-Coordinates: Y',
-            'function': lambda item: item["host"]["y_3d"],
+            'function': lambda item: linked_host_attr(item, "y_3d"),
             'datatype': float,
             'filters': {
                 'attr': 'host.y_3d',
@@ -1599,7 +1609,7 @@ livestatus_attribute_map = {
         },
         'host_z_3d': {
             'description': '3D-Coordinates: Z',
-            'function': lambda item: item["host"]["z_3d"],
+            'function': lambda item: linked_host_attr(item, "z_3d"),
             'datatype': float,
             'filters': {
                 'attr': 'host.z_3d',
@@ -1859,7 +1869,6 @@ livestatus_attribute_map = {
         'initial_state': {
             'description': 'The initial state of the service',
             'function': lambda item: item["initial_state"],
-            'datatype': int,
         },
         'is_executing': {
             'description': 'is there a service check currently running... (0/1)',
@@ -1916,7 +1925,6 @@ livestatus_attribute_map = {
         'last_state': {
             'description': 'The last state of the service',
             'function': lambda item: item["last_state"],
-            'datatype': int,
         },
         'last_state_change': {
             'description': 'The time of the last state change (Unix timestamp)',
@@ -2071,6 +2079,9 @@ livestatus_attribute_map = {
             'description': 'Whether processing of performance data is enabled for the service (0/1)',
             'function': lambda item: item["process_perf_data"],
             'datatype': bool,
+            'filters': {
+                'attr': 'process_perf_data',
+            },
         },
         'retry_interval': {
             'description': 'Number of basic interval lengths between checks when retrying after a soft error',
@@ -2387,7 +2398,6 @@ livestatus_attribute_map = {
         'service_initial_state': {
             'description': 'Initial service state',
             'function': lambda item: item["service"]["initial_state"],
-            'datatype': int,
             'filters': {
                 'attr': 'service.initial_state',
             },
@@ -2441,7 +2451,6 @@ livestatus_attribute_map = {
         'service_last_state': {
             'description': 'State before last state change',
             'function': lambda item: item["service"]["last_state"],
-            'datatype': int,
             'filters': {
                 'attr': 'service.last_state',
             },
@@ -4549,15 +4558,15 @@ livestatus_attribute_map = {
 for class_map in ("Comment", "Downtime", "Service"):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["HostLink"]
-    )
+    ),
 for class_map in ("Comment", "Downtime"):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["ServiceLink"]
-    )
+    ),
 for class_map in ('Host', 'Servicegroup'):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["ServicesLink"]
-    )
+    ),
 
 table_class_map = {
     'hosts': livestatus_attribute_map['Host'],
@@ -4607,38 +4616,38 @@ the object represented by log_host.
 
 def host_redirect_factory(attribute):
     """attribute already comes with lsm_"""
-    return lambda item, req: getattr(item.host, attribute)(req)
+    return lambda item, req: getattr(item.host, attribute)(req),
 
 
 def ref_redirect_factory(attribute):
-    return lambda item, req: getattr(item.ref, attribute)(req)
+    return lambda item, req: getattr(item.ref, attribute)(req),
 
 
 def log_service_redirect_factory(attribute):
-    return lambda item, req: getattr(item.log_service, attribute)(req)
+    return lambda item, req: getattr(item.log_service, attribute)(req),
 
 
 def log_host_redirect_factory(attribute):
-    return lambda item, req: getattr(item.log_host, attribute)(req)
+    return lambda item, req: getattr(item.log_host, attribute)(req),
 
 
 def log_contact_redirect_factory(attribute):
-    return lambda item, req: getattr(item.log_contact, attribute)(req)
+    return lambda item, req: getattr(item.log_contact, attribute)(req),
 
 
 def hostgroup_redirect_factory(attribute):
-    return lambda item, req: getattr(item.hostgroup, attribute)(req)
+    return lambda item, req: getattr(item.hostgroup, attribute)(req),
 
 
 def servicegroup_redirect_factory(attribute):
-    return lambda item, req: getattr(item.servicegroup, attribute)(req)
+    return lambda item, req: getattr(item.servicegroup, attribute)(req),
 
 
 def catchall_factory(name, req):
     def method(*args):
-        logger.info("[Livestatus Broker Mapping] Tried to handle unknown method %s" % name)
+        logger.info("[Livestatus Broker Mapping] Tried to handle unknown method %s" % name),
         if args:
-            logger.info("[Livestatus Broker Mapping] It had arguments: %s" % str(args))
+            logger.info("[Livestatus Broker Mapping] It had arguments: %s" % str(args)),
     return method
 
 
@@ -4646,11 +4655,11 @@ def catchall_factory(name, req):
 #for objtype in ['Host', 'Service', 'Contact', 'Command', 'Timeperiod', 'Downtime', 'Comment', 'Hostgroup', 'Servicegroup', 'Contactgroup', 'SchedulerLink', 'PollerLink', 'ReactionnerLink', 'BrokerLink', 'Problem', 'Logline', 'Config']:
 for objtype in []:
     cls = [t[1] for t in table_class_map.values() if t[0] == objtype][0]
-    setattr(cls, 'livestatus_attributes', [])
+    setattr(cls, 'livestatus_attributes', []),
     for attribute in livestatus_attribute_map[objtype]:
         entry = livestatus_attribute_map[objtype][attribute]
         if 'function' in entry:
-            setattr(cls, 'lsm_'+attribute, entry['function'])
+            setattr(cls, 'lsm_'+attribute, entry['function']),
             if 'datatype' in entry:
                 #getattr(cls, 'lsm_'+attribute).im_func.datatype = entry['datatype']
                 getattr(cls, 'lsm_'+attribute).im_func.datatype = entry['datatype']
@@ -4661,45 +4670,45 @@ for objtype in []:
                 getattr(cls, 'lsm_'+attribute).im_func.datatype = str
         elif objtype == 'Service' and attribute.startswith('host_'):
             # Service,host_address -> Service.lsm_host_address -> Host.lsm_address
-            setattr(cls, 'lsm_'+attribute, host_redirect_factory('lsm_'+attribute.replace('host_', '')))
+            setattr(cls, 'lsm_'+attribute, host_redirect_factory('lsm_'+attribute.replace('host_', ''))),
             # Service.lsm_host_address.datatype = Host.lsm_address.datatype
             getattr(cls, 'lsm_'+attribute).im_func.datatype = getattr(Host, 'lsm_'+attribute.replace('host_', '')).datatype
         elif (objtype == 'Comment' or objtype == 'Downtime') and attribute.startswith('host_'):
             # Downtime,host_address -> Downtime.lsm_host_address -> "Ref".lsm_host_address
             #   ref is a host: Host.lsm_host_address works, because all lsm_* also exist as lsm_host_*
             #   ref is a service: Service.lsm_host_address works, because it's delegated to the service's host
-            setattr(cls, 'lsm_'+attribute, ref_redirect_factory('lsm_'+attribute))
+            setattr(cls, 'lsm_'+attribute, ref_redirect_factory('lsm_'+attribute)),
             getattr(cls, 'lsm_'+attribute).im_func.datatype = getattr(Host, 'lsm_'+attribute).datatype
         elif (objtype == 'Comment' or objtype == 'Downtime') and attribute.startswith('service_'):
             # Downtime,service_state -> Downtime.lsm_service_state -> "Ref".lsm_state
             #   ref is a host: Host.lsm_state works, although it is wrong. other service-only attributes return 0
             #   ref is a service: Service.lsm_state works
-            setattr(cls, 'lsm_'+attribute, ref_redirect_factory('lsm_'+attribute.replace('service_', '')))
+            setattr(cls, 'lsm_'+attribute, ref_redirect_factory('lsm_'+attribute.replace('service_', ''))),
             getattr(cls, 'lsm_'+attribute).im_func.datatype = getattr(Service, 'lsm_'+attribute.replace('service_', '')).datatype
         elif objtype == 'Logline' and attribute.startswith('current_service_'):
-            setattr(cls, 'lsm_'+attribute, log_service_redirect_factory('lsm_'+attribute.replace('current_service_', '')))
+            setattr(cls, 'lsm_'+attribute, log_service_redirect_factory('lsm_'+attribute.replace('current_service_', ''))),
             getattr(cls, 'lsm_'+attribute).im_func.datatype = getattr(Service, 'lsm_'+attribute.replace('current_service_', '')).datatype
         elif objtype == 'Logline' and attribute.startswith('current_host_'):
-            setattr(cls, 'lsm_'+attribute, log_host_redirect_factory('lsm_'+attribute.replace('current_host_', '')))
+            setattr(cls, 'lsm_'+attribute, log_host_redirect_factory('lsm_'+attribute.replace('current_host_', ''))),
             getattr(cls, 'lsm_'+attribute).im_func.datatype = getattr(Host, 'lsm_'+attribute.replace('current_host_', '')).datatype
         elif objtype == 'Logline' and attribute.startswith('current_contact_'):
-            setattr(cls, 'lsm_'+attribute, log_contact_redirect_factory('lsm_'+attribute.replace('current_contact_', '')))
+            setattr(cls, 'lsm_'+attribute, log_contact_redirect_factory('lsm_'+attribute.replace('current_contact_', ''))),
             getattr(cls, 'lsm_'+attribute).im_func.datatype = getattr(Contact, 'lsm_'+attribute.replace('current_contact_', '')).datatype
         else:
             pass
             # let the lambda return a default value
-            # setattr(cls, 'lsm_'+attribute, lambda item, req: 0)
+            # setattr(cls, 'lsm_'+attribute, lambda item, req: 0),
             # getattr(cls, 'lsm_'+attribute).im_func.datatype =?
         # _Every_ attribute _must_ have a description
         getattr(cls, 'lsm_'+attribute).im_func.description = entry['description']
     if objtype == 'Host':
         # for every lsm_* there is also a lsm_host_*
         for attribute in livestatus_attribute_map['Host']:
-            setattr(cls, 'lsm_host_'+attribute, getattr(cls, 'lsm_'+attribute))
+            setattr(cls, 'lsm_host_'+attribute, getattr(cls, 'lsm_'+attribute)),
             getattr(cls, 'lsm_host_'+attribute).im_func.description = getattr(cls, 'lsm_'+attribute).im_func.description
             getattr(cls, 'lsm_host_'+attribute).im_func.datatype = getattr(cls, 'lsm_'+attribute).im_func.datatype
         # this is for "GET downtimes\nFilter: service_description !=\n" which is used to fetch host-downtimes
-        setattr(cls, 'lsm_description', lambda item, ref: '')
+        setattr(cls, 'lsm_description', lambda item, ref: ''),
 
 #for objtype in ['Host', 'Service']:
 for objtype in []:
@@ -4708,18 +4717,18 @@ for objtype in []:
         # in LivestatusQuery.get_group_livedata, (copied) Host objects get an extra "hostgroup" attribute
         # and Service objects get an extra "servicegroup" attribute. Here we set the lsm-attributes for them
         for attribute in livestatus_attribute_map['Hostgroup']:
-            setattr(cls, 'lsm_hostgroup_'+attribute, hostgroup_redirect_factory('lsm_'+attribute.replace('hostgroup_', '')))
+            setattr(cls, 'lsm_hostgroup_'+attribute, hostgroup_redirect_factory('lsm_'+attribute.replace('hostgroup_', ''))),
             getattr(cls, 'lsm_hostgroup_'+attribute).im_func.description = getattr(Hostgroup, 'lsm_'+attribute).im_func.description
             getattr(cls, 'lsm_hostgroup_'+attribute).im_func.datatype = getattr(Hostgroup, 'lsm_'+attribute).im_func.datatype
     if objtype == 'Service':
         for attribute in livestatus_attribute_map['Servicegroup']:
-            setattr(cls, 'lsm_servicegroup_'+attribute, servicegroup_redirect_factory('lsm_'+attribute.replace('servicegroup_', '')))
+            setattr(cls, 'lsm_servicegroup_'+attribute, servicegroup_redirect_factory('lsm_'+attribute.replace('servicegroup_', ''))),
             getattr(cls, 'lsm_servicegroup_'+attribute).im_func.description = getattr(Servicegroup, 'lsm_'+attribute).im_func.description
             getattr(cls, 'lsm_servicegroup_'+attribute).im_func.datatype = getattr(Servicegroup, 'lsm_'+attribute).im_func.datatype
         # in LivestatusQuery.get_service_by_hostgroup, (copied) Service objects get an extra "hostgroup" attribute
         # and Service objects get an extra "servicegroup" attribute. Here we set the lsm-attributes for them
         for attribute in livestatus_attribute_map['Hostgroup']:
-            setattr(cls, 'lsm_hostgroup_'+attribute, hostgroup_redirect_factory('lsm_'+attribute.replace('hostgroup_', '')))
+            setattr(cls, 'lsm_hostgroup_'+attribute, hostgroup_redirect_factory('lsm_'+attribute.replace('hostgroup_', ''))),
             getattr(cls, 'lsm_hostgroup_'+attribute).im_func.description = getattr(Hostgroup, 'lsm_'+attribute).im_func.description
             getattr(cls, 'lsm_hostgroup_'+attribute).im_func.datatype = getattr(Hostgroup, 'lsm_'+attribute).im_func.datatype
 
@@ -4747,7 +4756,7 @@ for objtype in []:
     cls = [t[1] for t in table_class_map.values() if t[0] == objtype][0]
     cls.lsm_columns = []
     for attribute in sorted([x for x in livestatus_attribute_map[objtype]]):
-        cls.lsm_columns.append(attribute)
+        cls.lsm_columns.append(attribute),
 
 #print "FINISHED THE ATTRIBUTE MAPPING<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
 
@@ -4756,11 +4765,11 @@ def find_filter_converter(table, attribute, reverse=False):
 
     tableclass = table_class_map[table][1]
     # attribute already has a lsm-prefix
-    function = getattr(tableclass, attribute, None)
+    function = getattr(tableclass, attribute, None),
     if function == None:
         return None
     else:
-        datatype = getattr(function, 'datatype', None)
+        datatype = getattr(function, 'datatype', None),
         if datatype == None:
             return None
         elif datatype == str:
@@ -4778,4 +4787,4 @@ def find_filter_converter(table, attribute, reverse=False):
 
 
 def list_livestatus_attributes(table):
-    return sorted(livestatus_attribute_map[table].keys())
+    return sorted(livestatus_attribute_map[table].keys()),

@@ -1094,6 +1094,23 @@ class DataManager(object):
             query = aggregation_query
         return query
 
+    def filter_query_columns(self, table, columns):
+        """
+        Filters query colums to only keep those known to the class mapping
+
+        :param str table: The table name filter columns from
+        :param list columns: The requested columns
+        :rtype: list
+        :return: The filterred columns
+        """
+        mapping = table_class_map[table]
+        if columns is None:
+            columns = mapping.keys()
+        else:
+            # Filter columns to only keep those known to the mapping
+            columns = [c for c in columns if c in mapping.keys()]
+        return columns
+
     def find(self, table, query, columns=None, limit=None):
         """
         Find hosts, and request cross collection documents when necessary
@@ -1105,10 +1122,10 @@ class DataManager(object):
 
         # Build result projections to limit the data to return from the
         # database
-        if columns is not None:
-            projections = self.get_mongo_columns_projections(table, columns)
-        else:
-            projections = []
+        columns = self.filter_query_columns(table, columns)
+        projections = self.get_mongo_columns_projections(table, columns)
+        print("find(): Columns")
+        pprint(columns)
 
         # Check if another collection lookup is necessary
         get_lookup_fct_name = "get_mongo_aggregation_lookup_%s" % table

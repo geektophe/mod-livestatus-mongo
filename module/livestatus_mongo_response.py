@@ -201,6 +201,8 @@ class LiveStatusMongoResponse:
     }
 
     def format_live_data_items(self, result, columns, aliases):
+        print("Columns:")
+        pprint(columns)
         if not columns:
             columns = table_class_map[self.query.table].keys()
             # There is no pre-selected list of columns. In this case
@@ -225,7 +227,6 @@ class LiveStatusMongoResponse:
             print("format_live_data_items()")
             pprint(item)
             row = []
-            print("Columns: %s" % columns)
             for column in columns:
                 mapping = table_class_map[self.query.table][column]
                 if "function" in mapping:
@@ -233,7 +234,11 @@ class LiveStatusMongoResponse:
                 else:
                     value = item[column]
                 if "datatype" in mapping:
-                    value = mapping["datatype"](value)
+                    try:
+                        value = mapping["datatype"](value)
+                    except:
+                        print("failed to map value %s to [%s]: %s" % (column, mapping["datatype"], value))
+                        raise
                 row.append(value)
             rows.append(row)
         if self.outputformat == "json":

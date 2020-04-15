@@ -37,6 +37,7 @@ from shinken_modules import TestConfig
 from shinken.comment import Comment
 
 from mock_livestatus import mock_livestatus_handle_request
+from livestatus.mongo_mapping import table_class_map
 from pprint import pprint
 
 
@@ -601,6 +602,17 @@ OutputFormat: python
             objlist.append([service, 0, 'OK'])
         self.scheduler_loop(1, objlist)
         self.update_broker()
+
+        query = """GET hosts
+Columns: host_name num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
+Filter: host_name = test_host_005
+OutputFormat: python
+"""
+
+        #                   H                 N   SO HO SW HW SC HC SU HU WS WH
+        expected_result = [[u'test_host_005', 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0]]
+        self.execute_and_assert(query, expected_result)
+
         svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
         svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_13")
         svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_03")
@@ -612,17 +624,52 @@ OutputFormat: python
         self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
         self.update_broker()
 
+        #                   H                 N  SO  HO SW HW SC HC SU HU WS WH
+        expected_result = [[u'test_host_005', 20, 0, 13, 1, 2, 1, 2, 0, 1, 2, 2]]
+        self.execute_and_assert(query, expected_result)
+
+    def _test_host_all_attrs(self):
         query = """GET hosts
-Columns: host_name num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
 Filter: host_name = test_host_005
 OutputFormat: python
 """
 
-        def assert_dummy(result):
-            pass
-        #                   H                 N  SO  HO SW HW SC HC SU HU WS WH
-        expected_result = [[u'test_host_005', 20, 0, 13, 1, 2, 1, 2, 0, 1, 2, 2]]
+        def assert_column_count(result):
+            mapping = table_class_map['hosts']
+            self.assertEqual(len(result), 1)
+            self.assertEqual(len(result[0]), len(mapping))
+
+        self.execute_and_assert(query, assert_column_count)
+
+    def test_cross_collections_services(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+
+        query = """GET services
+Columns: host_name host_alias host_state host_state_type host_plugin_output
+Filter: host_name = test_host_005
+Filter: description = test_ok_00
+OutputFormat: python
+"""
+
+        expected_result = [['test_host_005', 'flap_005', 0, 1, 'UP']]
         self.execute_and_assert(query, expected_result)
+
+        host = self.sched.hosts.find_by_name("test_host_005")
+        self.scheduler_loop(1, [[host, 1, 'DOWN']])
+        self.update_broker()
+
+        expected_result = [['test_host_005', 'flap_005', 1, 0, 'DOWN']]
+        self.execute_and_assert(query, expected_result)
+
+
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01
