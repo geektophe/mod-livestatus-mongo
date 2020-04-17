@@ -40,7 +40,9 @@ class DataManager(object):
         self.db = db
 
     def normalize(self, obj):
-        if hasattr(obj, "get_name"):
+        if hasattr(obj, "get_full_name"):
+            return obj.get_full_name()
+        elif hasattr(obj, "get_name"):
             return obj.get_name()
         elif isinstance(obj, list):
             return [self.normalize(o) for o in obj]
@@ -75,6 +77,13 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
+        # Manages some brok format curiosities
+        # Hostgroups transformation into list
+        hg = brok.data.get("hostgroups")
+        if hg is not None and not isinstance(hg, list):
+            brok.data["hostgroups"] = [
+                n.strip() for n in hg.split(',') if n.strip()
+            ]
         self.update_object("host", brok)
 
     def manage_initial_hostgroup_status_brok(self, brok):
@@ -83,6 +92,13 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
+        # Manages some brok format curiosities
+        # Hostgroup members
+        members = brok.data.get("members")
+        if members is not None:
+            brok.data["members"] = [
+                m[1] for m in members
+            ]
         self.update_object("hostgroup", brok)
 
     def manage_initial_service_status_brok(self, brok):
@@ -91,6 +107,13 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
+        # Manages some brok format curiosities
+        # Servicegroups transformation into list
+        sg = brok.data.get("servicegroups")
+        if sg is not None and not isinstance(sg, list):
+            brok.data["servicegroups"] = [
+                n.strip() for n in sg.split(',') if n.strip()
+            ]
         self.update_object("service", brok)
 
     def manage_initial_servicegroup_status_brok(self, brok):
@@ -181,6 +204,122 @@ class DataManager(object):
         """
         print("Brok: %s" % brok.type)
         pprint(brok.data)
+        # Builds cross objects references
+        # Hostgroups -> hosts (members)
+        # Hostgroups -> services (members_hosts)
+        # Hostgroups -> services (members_services)
+        # Hostgroups -> contacts (contacts)
+        services_hg = {}
+        for hg in self.db.hostgroups.find(projection={'_id': 1}):
+            group_name = hg["_id"]
+            members = []
+            members_services = []
+            contacts = []
+            hosts = self.db.hosts.find(
+                    {"hostgroups": {"$in": [group_name]}},
+                    {'_id': 1, 'contacts': 1}
+                    )
+            hosts = self.db.services.aggregate([
+                {"$match": {"hostgroups": {"$in": [group_name]}}},
+                {
+                    "$lookup": {
+                        'from': 'services',
+                        'as': 'services',
+                        'localField': 'host_name',
+                        'foreignField': 'host_name',
+                    }
+                },
+                {
+                    "$project": {
+                        '_id': 1,
+                        'contacts': 1,
+                        'host_name': 1,
+                        'services._id': 1,
+                        'services.contacts': 1,
+                    }
+                },
+            ])
+
+            for host in hosts:
+                members.append(host["_id"])
+                contacts.extend(host.get("contacts", []))
+                for service in host["services"]:
+                    svc_id = service["_id"]
+                    contacts.extend(service.get("contacts", []))
+                    # Registers hostgroup intto the service
+                    services_hg.setdefault(svc_id, []).append(group_name)
+            members_services = list(set(members_services))
+            contacts = list(set(contacts))
+            self.db.hostgroups.update(
+                {"_id": group_name},
+                {
+                    "$set": {
+                        "members": members,
+                        "contacts": contacts
+                    }
+                }
+            )
+        for svc_id, hostgroups in services_hg.items():
+            self.db.services.update(
+                {"_id": svc_id},
+                {"$set": {"hostgroups": list(set(hostgroups))}},
+            )
+
+        # Servicegroups -> services (members)
+        # Servicegroups -> services (members_hosts)
+        # Servicegroups -> services (members_services)
+        # Servicegroups -> contacts (contacts)
+        hosts_sg = {}
+        for sg in self.db.servicegroups.find(projection={'_id': 1}):
+            group_name = sg["_id"]
+            members = []
+            members_hosts = []
+            contacts = []
+            services = self.db.services.aggregate([
+                {"$match": {"servicegroups": {"$in": [group_name]}}},
+                {
+                    "$lookup": {
+                        'from': 'hosts',
+                        'as': 'hosts',
+                        'localField': 'host_name',
+                        'foreignField': 'host_name',
+                    }
+                },
+                {
+                    "$project": {
+                        '_id': 1,
+                        'contacts': 1,
+                        'host_name': 1,
+                        'hosts.contacts': 1,
+                    }
+                },
+            ])
+            for service in services:
+                members_services.append(service["_id"])
+                contacts.extend(service.get("contacts", []))
+                members_hosts.append(service["host_name"])
+                hname = service["host_name"]
+                hosts_sg.setdefault(hname, []).append(group_name)
+                for host in service["hosts"]:
+                    contacts.extend(host.get("contacts", []))
+                    # Registers serviecgroup intto the host
+            members = list(set(members))
+            contacts = list(set(contacts))
+            self.db.servicegroups.update(
+                {"_id": group_name},
+                {
+                    "$set": {
+                        "members": members,
+                        "contacts": contacts,
+                    },
+                }
+            )
+        for hst_id, servicegroups in hosts_sg.items():
+            self.db.hosts.update(
+                {"_id": hst_id},
+                {"$set": {"servicegroups": list(set(servicegroups))}},
+            )
+
 
     def manage_update_program_status_brok(self, brok):
         """
@@ -197,6 +336,13 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
+        # Manages some brok format curiosities
+        # Hostgroups transformation into list
+        hg = brok.data.get("hostgroups")
+        if hg is not None and not isinstance(hg, list):
+            brok.data["hostgroups"] = [
+                n.strip() for n in hg.split(',') if n.strip()
+            ]
         self.update_object("host", brok)
 
     def manage_update_service_status_brok(self, brok):
@@ -205,6 +351,13 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
+        # Manages some brok format curiosities
+        # Servicegroups transformation into list
+        sg = brok.data.get("servicegroups")
+        if sg is not None and not isinstance(sg, list):
+            brok.data["servicegroups"] = [
+                n.strip() for n in sg.split(',') if n.strip()
+            ]
         self.update_object("service", brok)
 
     def manage_update_broker_status_brok(self, brok):
@@ -1004,16 +1157,16 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         if not projections or any([p.startswith("services.") for p in projections]):
-            return {
+            return [{
                 "$lookup": {
                     "from": "services",
                     "localField": "host_name",
                     "foreignField": "host_name",
                     "as": "services",
                 }
-            }
+            }]
         else:
-            return None
+            return []
 
     def get_mongo_aggregation_lookup_services(self, pipeline, projections):
         """
@@ -1025,17 +1178,79 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        if not projections or any([p.startswith("host.") for p in projections]):
-            return {
+        if not projections or any([p.startswith("hosts.") for p in projections]):
+            return [{
                 "$lookup": {
                     "from": "hosts",
                     "localField": "host_name",
                     "foreignField": "host_name",
-                    "as": "host",
+                    "as": "hosts",
                 }
-            }
+            }]
         else:
-            return None
+            return []
+
+    def get_mongo_aggregation_lookup_hostgroups(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projections or any([p.startswith("hosts.") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "hosts",
+                    "localField": "hostgroup_name",
+                    "foreignField": "hostgroups",
+                    "as": "hosts",
+                }
+            })
+        if not projections or any([p.startswith("services.") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "services",
+                    "localField": "hostgroup_name",
+                    "foreignField": "hostgroups",
+                    "as": "services",
+                }
+            })
+        return lookup
+
+    def get_mongo_aggregation_lookup_servicegroups(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projections or any([p.startswith("hosts.") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "hosts",
+                    "localField": "servicegroup_name",
+                    "foreignField": "servicegroups",
+                    "as": "hosts",
+                }
+            })
+        if not projections or any([p.startswith("services.") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "services",
+                    "localField": "servicegroup_name",
+                    "foreignField": "servicegroups",
+                    "as": "services",
+                }
+            })
+        return lookup
 
     def get_filter_query(self, table, stack):
         """
@@ -1134,7 +1349,7 @@ class DataManager(object):
         if get_lookup_fct:
             lookup = get_lookup_fct(table, projections)
         else:
-            lookup = None
+            lookup = []
 
         # If another collection $lookup is necessary, use an aggregation
         # rather than a search
@@ -1144,7 +1359,7 @@ class DataManager(object):
             ]
             if limit:
                 pipeline.append({"$limit": limit})
-            pipeline.append(lookup)
+            pipeline.extend(lookup)
             if projections:
                 pipeline.append({
                     "$project": projections

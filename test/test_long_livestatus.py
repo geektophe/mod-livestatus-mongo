@@ -592,7 +592,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_authuser)
 
-    def test_cross_collections_hosts(self):
+    def _test_cross_collections_hosts(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -641,7 +641,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_column_count)
 
-    def test_cross_collections_services(self):
+    def _test_cross_collections_services(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -669,6 +669,82 @@ OutputFormat: python
         expected_result = [['test_host_005', 'flap_005', 1, 0, 'DOWN']]
         self.execute_and_assert(query, expected_result)
 
+
+    def _test_cross_collections_hostgroups(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+
+        query = """GET hostgroups
+Columns: name num_hosts_pending num_hosts_unreach num_hosts_up num_hosts_down worst_host_state num_hosts num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
+Filter: name = hostgroup_01
+OutputFormat: python
+"""
+
+        expected_result = [['hostgroup_01', 0, 0, 2, 0, 0, 2, 40, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0]]
+        self.execute_and_assert(query, expected_result)
+
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_13")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_03")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_unknown_08")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_06")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_flap_09")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
+
+        host = self.sched.hosts.find_by_name("test_host_005")
+        self.scheduler_loop(5, [[host, 1, 'DOWN']])
+        self.update_broker()
+
+        #                   H                 N  SO  HO SW HW SC HC SU HU WS WH
+        expected_result = [['servicegroup_01', 0, 0, 10, 0, 0, 10, 40, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0]]
+        self.execute_and_assert(query, expected_result)
+
+    def test_cross_collections_servicegroup(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+
+        query = """GET servicegroups
+Columns: name num_hosts_pending num_hosts_unreach num_hosts_up num_hosts_down worst_host_state num_hosts num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
+Filter: name = servicegroup_06
+OutputFormat: python
+"""
+
+        expected_result = [['servicegroup_06', 0, 0, 2, 0, 0, 2, 40, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0]]
+        self.execute_and_assert(query, expected_result)
+
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_13")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_03")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_unknown_08")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_06")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_flap_09")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
+
+        host = self.sched.hosts.find_by_name("test_host_005")
+        self.scheduler_loop(1, [[host, 1, 'DOWN']])
+        self.update_broker()
+
+        #                   H                 N  SO  HO SW HW SC HC SU HU WS WH
+        expected_result = [['servicegroup_06', 0, 0, 1, 0, 0, 2, 40, 0, 33, 1, 2, 1, 2, 0, 1, 2, 2]]
+        self.execute_and_assert(query, expected_result)
 
 
     def _test_worst_service_state(self):

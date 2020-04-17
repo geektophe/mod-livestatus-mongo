@@ -26,7 +26,6 @@
 from types import GeneratorType
 from collections import namedtuple
 from mongo_mapping import table_class_map
-from pprint import pprint
 
 import csv
 import json
@@ -201,8 +200,6 @@ class LiveStatusMongoResponse:
     }
 
     def format_live_data_items(self, result, columns, aliases):
-        print("Columns:")
-        pprint(columns)
         if not columns:
             columns = table_class_map[self.query.table].keys()
             # There is no pre-selected list of columns. In this case
@@ -224,8 +221,6 @@ class LiveStatusMongoResponse:
             rows.append(headers)
 
         for item in result:
-            print("format_live_data_items()")
-            pprint(item)
             row = []
             for column in columns:
                 mapping = table_class_map[self.query.table][column]

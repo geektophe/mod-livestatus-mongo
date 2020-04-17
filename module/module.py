@@ -314,7 +314,7 @@ class LiveStatus_broker(BaseModule, Daemon):
     def manage_brok(self, brok):
         """We use this method mostly for the unit tests"""
         brok.prepare()
-        self.rg.manage_brok(brok)
+        #self.rg.manage_brok(brok)
         self.mongo_datamgr.manage_brok(brok)
 
         for mod in self.modules_manager.get_internal_instances():
