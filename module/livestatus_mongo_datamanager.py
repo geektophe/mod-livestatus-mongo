@@ -215,16 +215,12 @@ class DataManager(object):
             members = []
             members_services = []
             contacts = []
-            hosts = self.db.hosts.find(
-                    {"hostgroups": {"$in": [group_name]}},
-                    {'_id': 1, 'contacts': 1}
-                    )
-            hosts = self.db.services.aggregate([
+            hosts = self.db.hosts.aggregate([
                 {"$match": {"hostgroups": {"$in": [group_name]}}},
                 {
                     "$lookup": {
                         'from': 'services',
-                        'as': 'services',
+                        'as': '__services__',
                         'localField': 'host_name',
                         'foreignField': 'host_name',
                     }
@@ -234,8 +230,8 @@ class DataManager(object):
                         '_id': 1,
                         'contacts': 1,
                         'host_name': 1,
-                        'services._id': 1,
-                        'services.contacts': 1,
+                        '__services__._id': 1,
+                        '__services__.contacts': 1,
                     }
                 },
             ])
@@ -243,7 +239,7 @@ class DataManager(object):
             for host in hosts:
                 members.append(host["_id"])
                 contacts.extend(host.get("contacts", []))
-                for service in host["services"]:
+                for service in host["__services__"]:
                     svc_id = service["_id"]
                     contacts.extend(service.get("contacts", []))
                     # Registers hostgroup intto the service
@@ -280,7 +276,7 @@ class DataManager(object):
                 {
                     "$lookup": {
                         'from': 'hosts',
-                        'as': 'hosts',
+                        'as': '__hosts__',
                         'localField': 'host_name',
                         'foreignField': 'host_name',
                     }
@@ -290,7 +286,7 @@ class DataManager(object):
                         '_id': 1,
                         'contacts': 1,
                         'host_name': 1,
-                        'hosts.contacts': 1,
+                        '__hosts__.contacts': 1,
                     }
                 },
             ])
@@ -300,7 +296,7 @@ class DataManager(object):
                 members_hosts.append(service["host_name"])
                 hname = service["host_name"]
                 hosts_sg.setdefault(hname, []).append(group_name)
-                for host in service["hosts"]:
+                for host in service["__hosts__"]:
                     contacts.extend(host.get("contacts", []))
                     # Registers serviecgroup intto the host
             members = list(set(members))
@@ -1156,13 +1152,13 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        if not projections or any([p.startswith("services.") for p in projections]):
+        if not projections or any([p.startswith("__services__") for p in projections]):
             return [{
                 "$lookup": {
                     "from": "services",
                     "localField": "host_name",
                     "foreignField": "host_name",
-                    "as": "services",
+                    "as": "__services__",
                 }
             }]
         else:
@@ -1178,13 +1174,13 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        if not projections or any([p.startswith("hosts.") for p in projections]):
+        if not projections or any([p.startswith("__hosts__") for p in projections]):
             return [{
                 "$lookup": {
                     "from": "hosts",
                     "localField": "host_name",
                     "foreignField": "host_name",
-                    "as": "hosts",
+                    "as": "__hosts__",
                 }
             }]
         else:
@@ -1201,22 +1197,22 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projections or any([p.startswith("hosts.") for p in projections]):
+        if not projections or any([p.startswith("__hosts__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "hostgroup_name",
                     "foreignField": "hostgroups",
-                    "as": "hosts",
+                    "as": "__hosts__",
                 }
             })
-        if not projections or any([p.startswith("services.") for p in projections]):
+        if not projections or any([p.startswith("__services__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "hostgroup_name",
                     "foreignField": "hostgroups",
-                    "as": "services",
+                    "as": "__services__",
                 }
             })
         return lookup
@@ -1232,22 +1228,22 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projections or any([p.startswith("hosts.") for p in projections]):
+        if not projections or any([p.startswith("__hosts__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "servicegroup_name",
                     "foreignField": "servicegroups",
-                    "as": "hosts",
+                    "as": "__hosts__",
                 }
             })
-        if not projections or any([p.startswith("services.") for p in projections]):
+        if not projections or any([p.startswith("__services__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "servicegroup_name",
                     "foreignField": "servicegroups",
-                    "as": "services",
+                    "as": "__services__",
                 }
             })
         return lookup
@@ -1326,7 +1322,20 @@ class DataManager(object):
             columns = [c for c in columns if c in mapping.keys()]
         return columns
 
-    def find(self, table, query, columns=None, limit=None):
+    def get_collection(self, table):
+        """
+        Returns the collection object corresponding to the requested table.
+
+        :param str table: The table name
+        """
+        match = re.match("^([a-z]+)by([a-z]+)$", table)
+        if match is not None:
+            collection = match.group(1)
+        else:
+            collection = table
+        return getattr(self.db, collection)
+
+    def find(self, table, query, columns=None, limit=None, sort=None, groupby=None):
         """
         Find hosts, and request cross collection documents when necessary
 
@@ -1351,9 +1360,10 @@ class DataManager(object):
         else:
             lookup = []
 
+        print("find(): groupby: %s" % groupby)
         # If another collection $lookup is necessary, use an aggregation
         # rather than a search
-        if lookup:
+        if lookup or groupby:
             pipeline = [
                 {"$match": query}
             ]
@@ -1364,9 +1374,20 @@ class DataManager(object):
                 pipeline.append({
                     "$project": projections
                 })
-            pipeline.append(
-                {"$sort": {"_id": 1}}
-            )
+            if groupby is not None:
+                pipeline.append({"$unwind": "$%s" % groupby})
+            if sort is not None:
+                pipeline.append(
+                    {"$sort": {sort: 1}}
+                )
+            elif groupby is not None:
+                pipeline.append(
+                    {"$sort": {groupby: 1}}
+                )
+            else:
+                pipeline.append(
+                    {"$sort": {"_id": 1}}
+                )
             print("find(): aggregation pipeline:")
             pprint(pipeline)
             cursor = collection.aggregate(pipeline)

@@ -88,7 +88,7 @@ class TestConfigBig(TestConfig):
         else:
             self.assertEqual(pyresponse, expected_result)
 
-    def _test_simple_query(self):
+    def test_simple_query(self):
         """
         Tests a simple query execution
         """
@@ -323,7 +323,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
-    def _test_nested_and_or_query(self):
+    def test_nested_and_or_query(self):
         """
         Tests a simple query execution
         """
@@ -393,7 +393,7 @@ OutputFormat: python
         expected_result = []
         self.execute_and_assert(query, expected_result)
 
-    def _test_negate(self):
+    def test_negate(self):
         expected_result = [['test_host_001', 'pending_001']]
         # List matches (case insensitive)
         query = """GET hosts
@@ -443,7 +443,7 @@ OutputFormat: python
 """
         self.execute_and_assert(query, negate_hosts_condition)
 
-    def _test_stats(self):
+    def test_stats(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -530,7 +530,7 @@ OutputFormat: python"""
         self.execute_and_assert(query, expected_result)
 
 
-    def _test_limit(self):
+    def test_limit(self):
         """
         Tests result count limitting
         """
@@ -561,7 +561,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_len)
 
-    def _test_authuser(self):
+    def test_authuser(self):
         """
         Tests limitting results what's authorized to authenticated user
         """
@@ -592,7 +592,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_authuser)
 
-    def _test_cross_collections_hosts(self):
+    def test_cross_collections_hosts(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -628,7 +628,7 @@ OutputFormat: python
         expected_result = [[u'test_host_005', 20, 0, 13, 1, 2, 1, 2, 0, 1, 2, 2]]
         self.execute_and_assert(query, expected_result)
 
-    def _test_host_all_attrs(self):
+    def test_host_all_attrs(self):
         query = """GET hosts
 Filter: host_name = test_host_005
 OutputFormat: python
@@ -641,7 +641,7 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_column_count)
 
-    def _test_cross_collections_services(self):
+    def test_cross_collections_services(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -670,7 +670,7 @@ OutputFormat: python
         self.execute_and_assert(query, expected_result)
 
 
-    def _test_cross_collections_hostgroups(self):
+    def test_cross_collections_hostgroups(self):
         self.print_header()
         now = time.time()
         objlist = []
@@ -701,11 +701,10 @@ OutputFormat: python
         self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
 
         host = self.sched.hosts.find_by_name("test_host_005")
-        self.scheduler_loop(5, [[host, 1, 'DOWN']])
+        self.scheduler_loop(1, [[host, 1, 'DOWN']])
         self.update_broker()
 
-        #                   H                 N  SO  HO SW HW SC HC SU HU WS WH
-        expected_result = [['servicegroup_01', 0, 0, 10, 0, 0, 10, 40, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0]]
+        expected_result = [['hostgroup_01', 0, 0, 1, 0, 0, 2, 40, 0, 33, 1, 2, 1, 2, 0, 1, 2, 2]]
         self.execute_and_assert(query, expected_result)
 
     def test_cross_collections_servicegroup(self):
@@ -746,6 +745,47 @@ OutputFormat: python
         expected_result = [['servicegroup_06', 0, 0, 1, 0, 0, 2, 40, 0, 33, 1, 2, 1, 2, 0, 1, 2, 2]]
         self.execute_and_assert(query, expected_result)
 
+    def test_hostgroup_all_attrs(self):
+        query = """GET hostgroups
+Filter: name = hostgroup_01
+OutputFormat: python
+"""
+
+        def assert_column_count(result):
+            mapping = table_class_map['hostgroups']
+            self.assertEqual(len(result), 1)
+            self.assertEqual(len(result[0]), len(mapping))
+
+        self.execute_and_assert(query, assert_column_count)
+
+    def test_servicegroup_all_attrs(self):
+        query = """GET servicegroups
+Filter: name = servicegroup_01
+OutputFormat: python
+"""
+
+        def assert_column_count(result):
+            mapping = table_class_map['servicegroups']
+            self.assertEqual(len(result), 1)
+            self.assertEqual(len(result[0]), len(mapping))
+
+        self.execute_and_assert(query, assert_column_count)
+
+
+    def test_hostsbyroup(self):
+        query = """GET hostsbygroup
+Filter: groups >= hostgroup_01
+OutputFormat: python
+"""
+
+        def assert_hosts(result):
+            pprint(result)
+            return
+            mapping = table_class_map['hostgroups']
+            self.assertEqual(len(result), 1)
+            self.assertEqual(len(result[0]), len(mapping))
+
+        self.execute_and_assert(query, assert_hosts)
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01
@@ -754,7 +794,6 @@ OutputFormat: python
         host_005 = self.sched.hosts.find_by_name("test_host_005")
         test_ok_00 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
         test_ok_01 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_01")
-        test_ok_04 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_04")
         test_ok_16 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
         objlist = []
         for service in [svc for host in hostgroup_01.get_hosts() for svc in host.services]:

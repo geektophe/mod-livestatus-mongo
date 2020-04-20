@@ -377,18 +377,35 @@ class LiveStatusMongoQuery(object):
         """
         return self.datamgr.rg.get_table(table_name)
 
-    def execute_filter_query(self):
+    def execute_filter_query(self, table=None):
         """
         Execute a filter query
         """
-        print("Mongo filter query: table: %s" % self.table)
-        query = mongo_datamgr.get_filter_query(self.table, self.mongo_filters)
+        if table is None:
+            table = self.table
+        print("Mongo filter query: table: %s" % table)
+        query = mongo_datamgr.get_filter_query(table, self.mongo_filters)
         pprint(query)
         return mongo_datamgr.find(
-            self.table,
+            table,
             query,
             self.columns,
-            self.limit
+            self.limit,
+        )
+
+    def execute_groupby_filter_query(self, table, groupby):
+        """
+        Execute a filter query
+        """
+        print("Mongo filter query: table: %s" % table)
+        query = mongo_datamgr.get_filter_query(table, self.mongo_filters)
+        pprint(query)
+        return mongo_datamgr.find(
+            table,
+            query,
+            self.columns,
+            self.limit,
+            groupby=groupby
         )
 
 #    def get_mongo_aggregation_query(self, filter_query, query):
@@ -429,29 +446,27 @@ class LiveStatusMongoQuery(object):
 #            query = aggregation_query
 #        return query
 
-    def execute_aggregation_query(self):
+    def execute_aggregation_query(self, table=None):
         """
         Execute an aggregation query
-
-        There's 2 distinct Stats queries:
-
-        - The attribute = value stats that is in fact
         """
+        if table is None:
+            table = self.table
         results = []
         filter_query = mongo_datamgr.get_filter_query(
-            self.table,
+            table,
             self.mongo_filters
         )
         # If no aggregation has been
         for query in self.mongo_stats_filters:
-            query = mongo_datamgr.get_aggregation_query(self.table, filter_query, query)
-            print("Mongo aggregation query: table: %s" % self.table)
+            query = mongo_datamgr.get_aggregation_query(table, filter_query, query)
+            print("Mongo aggregation query: table: %s" % table)
             pprint(query)
-            for result in mongo_datamgr.aggregate(self.table, query):
+            for result in mongo_datamgr.aggregate(table, query):
                 results.append(result["result"])
         return results
 
-    def get_filtered_livedata(self):
+    def get_filtered_livedata(self, table=None):
         """
         Retrieves direct hosts or services from the mongo database
         """
@@ -460,9 +475,40 @@ class LiveStatusMongoQuery(object):
         requested
         """
         if self.mongo_stats_filters:
-            return self.execute_aggregation_query()
+            return self.execute_aggregation_query(table)
         else:
-            return self.execute_filter_query()
+            return self.execute_filter_query(table)
+
+    def get_hostsbygroup_livedata(self):
+        """
+        For each hostgroup, get the member hosts (filterred) and merge the
+        hostgroup attributes.
+        """
+        if self.mongo_stats_filters:
+            return self.execute_aggregation_query("hosts", "hostgroups")
+        else:
+            return self.execute_groupby_filter_query("hosts", "hostgroups")
+
+    def get_servicesbygroup_livedata(self):
+        """
+        For each hostgroup, get the member hosts (filterred) and merge the
+        hostgroup attributes.
+        """
+        if self.mongo_stats_filters:
+            return self.execute_aggregation_query("services", "servicegroups")
+        else:
+            return self.execute_filter_query("services", "servicegroups")
+
+    def get_servicesbyhostgroup_livedata(self):
+        """
+        For each hostgroup, get the member hosts (filterred) and merge the
+        hostgroup attributes.
+        """
+        if self.mongo_stats_filters:
+            return self.execute_aggregation_query("services", "hostgroups")
+        else:
+            return self.execute_filter_query("services", "hostgroups")
+
 
     def get_list_livedata(self, cs):
         t = self.table
@@ -504,7 +550,7 @@ class LiveStatusMongoQuery(object):
             )
         ), key=sorter)
 
-    def get_hostsbygroup_livedata(self, cs):
+    def _get_hostsbygroup_livedata(self, cs):
         sorter = lambda k: k.hostgroup.hostgroup_name
         return self.get_group_livedata(cs, self.get_table("hosts").__itersorted__(self.metainfo.query_hints), 'hostgroups', 'hostgroup', sorter)
 
