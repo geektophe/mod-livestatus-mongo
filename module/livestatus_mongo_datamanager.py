@@ -1248,6 +1248,88 @@ class DataManager(object):
             })
         return lookup
 
+    def get_mongo_aggregation_lookup_hostsbygroup(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projections or any([p.startswith("__hostgroups__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "hostgroups",
+                    "localField": "hostgroups",
+                    "foreignField": "hostgroup_name",
+                    "as": "__hostgroups__",
+                }
+            })
+        if not projections or any([p.startswith("__hostgroups_hosts__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "hosts",
+                    "localField": "hostgroups",
+                    "foreignField": "hostgroups",
+                    "as": "__hostgroups_hosts__",
+                }
+            })
+        if not projections or any([p.startswith("__hostgroups_services__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "services",
+                    "localField": "hostgroups",
+                    "foreignField": "hostgroups",
+                    "as": "__hostgroups_services__",
+                }
+            })
+        return lookup
+
+    def get_mongo_aggregation_lookup_servicesbygroup(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projections or any([p.startswith("__servicegroups__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "servicegroups",
+                    "localField": "servicegroups",
+                    "foreignField": "servicegroup_name",
+                    "as": "__servicegroups__",
+                }
+            })
+        if not projections or any([p.startswith("__servicegroups_hosts__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "hosts",
+                    "localField": "servicegroups",
+                    "foreignField": "servicegroups",
+                    "as": "__servicegroups_hosts__",
+                }
+            })
+        if not projections or any([p.startswith("__servicegroups_services__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "services",
+                    "localField": "servicegroups",
+                    "foreignField": "servicegroups",
+                    "as": "__servicegroups_services__",
+                }
+            })
+        return lookup
+
+    get_mongo_aggregation_lookup_servicesygroup = get_mongo_aggregation_lookup_hostsbygroup
+
     def get_filter_query(self, table, stack):
         """
         Generates the final filter query from the list of queries in
@@ -1333,6 +1415,7 @@ class DataManager(object):
             collection = match.group(1)
         else:
             collection = table
+        print("get_collection(): collection: %s" % collection)
         return getattr(self.db, collection)
 
     def find(self, table, query, columns=None, limit=None, sort=None, groupby=None):
@@ -1342,17 +1425,20 @@ class DataManager(object):
         :rtype: iterator
         :return: The query result
         """
-        collection = getattr(self.db, table)
+        collection = self.get_collection(table)
 
         # Build result projections to limit the data to return from the
         # database
         columns = self.filter_query_columns(table, columns)
         projections = self.get_mongo_columns_projections(table, columns)
+        if groupby is not None and groupby not in projections:
+            projections[groupby] = 1
         print("find(): Columns")
         pprint(columns)
 
         # Check if another collection lookup is necessary
         get_lookup_fct_name = "get_mongo_aggregation_lookup_%s" % table
+        print("find(): get_lookup_fct_name: %s" % get_lookup_fct_name)
         get_lookup_fct = getattr(self, get_lookup_fct_name, None)
 
         if get_lookup_fct:
@@ -1369,20 +1455,25 @@ class DataManager(object):
             ]
             if limit:
                 pipeline.append({"$limit": limit})
+            if groupby is not None:
+                # We do a second match as the $unwind may have expanded
+                # documents that we do not want
+                pipeline.extend([
+                    {"$unwind": "$%s" % groupby},
+                    {"$match": query}
+                ])
             pipeline.extend(lookup)
             if projections:
                 pipeline.append({
                     "$project": projections
                 })
-            if groupby is not None:
-                pipeline.append({"$unwind": "$%s" % groupby})
             if sort is not None:
                 pipeline.append(
                     {"$sort": {sort: 1}}
                 )
             elif groupby is not None:
                 pipeline.append(
-                    {"$sort": {groupby: 1}}
+                    {"$sort": {groupby: 1, "_id": 1}}
                 )
             else:
                 pipeline.append(

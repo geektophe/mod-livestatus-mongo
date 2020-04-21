@@ -377,26 +377,12 @@ class LiveStatusMongoQuery(object):
         """
         return self.datamgr.rg.get_table(table_name)
 
-    def execute_filter_query(self, table=None):
+    def execute_filter_query(self, table=None, groupby=None):
         """
         Execute a filter query
         """
         if table is None:
             table = self.table
-        print("Mongo filter query: table: %s" % table)
-        query = mongo_datamgr.get_filter_query(table, self.mongo_filters)
-        pprint(query)
-        return mongo_datamgr.find(
-            table,
-            query,
-            self.columns,
-            self.limit,
-        )
-
-    def execute_groupby_filter_query(self, table, groupby):
-        """
-        Execute a filter query
-        """
         print("Mongo filter query: table: %s" % table)
         query = mongo_datamgr.get_filter_query(table, self.mongo_filters)
         pprint(query)
@@ -485,9 +471,9 @@ class LiveStatusMongoQuery(object):
         hostgroup attributes.
         """
         if self.mongo_stats_filters:
-            return self.execute_aggregation_query("hosts", "hostgroups")
+            return self.execute_aggregation_query("hostsbygroup", "hostgroups")
         else:
-            return self.execute_groupby_filter_query("hosts", "hostgroups")
+            return self.execute_filter_query("hostsbygroup", "hostgroups")
 
     def get_servicesbygroup_livedata(self):
         """
