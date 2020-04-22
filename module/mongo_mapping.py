@@ -3725,8 +3725,9 @@ livestatus_attribute_map = {
             'datatype': int,
             'projections': [
                 '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
             ],
-            'projections': [],
             'filters': {}
         },
         'hostgroup_num_services_hard_crit': {
@@ -3854,16 +3855,25 @@ livestatus_attribute_map = {
     'Servicesbygroup': {
         'servicegroup_action_url': {
             'description': 'An optional URL to custom notes or actions on the service group',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "servicegroups", "action_url"),
+            'filters': {
+                'attr': '__servicegroups__.action_url',
+            },
         },
         'servicegroup_alias': {
             'description': 'An alias of the service group',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "servicegroups", "alias"),
+            'filters': {
+                'attr': '__servicegroups__.alias',
+            },
         },
         'servicegroup_members': {
             'description': 'A list of all members of the service group as host/service pairs',
-            'function': lambda item: [],  # REPAIRME
+            'function': lambda item: linked_attr(item, "servicegroups", "members"),
             'datatype': list,
+            'filters': {
+                'attr': '__servicegroups__.members',
+            },
         },
         'servicegroup_members_with_state': {
             'description': 'A list of all members of the service group with state and has_been_checked',
@@ -3872,85 +3882,174 @@ livestatus_attribute_map = {
         },
         'servicegroup_name': {
             'description': 'The name of the service group',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "servicegroups", "servicegroup_name"),
+            'filters': {
+                'attr': '__servicegroups__.servicegroup_name',
+            },
         },
         'servicegroup_notes': {
             'description': 'Optional additional notes about the service group',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "servicegroups", "notes"),
+            'filters': {
+                'attr': '__servicegroups__.notes',
+            },
         },
         'servicegroup_notes_url': {
             'description': 'An optional URL to further notes on the service group',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "servicegroups", "notes_url"),
+            'filters': {
+                'attr': '__servicegroups__.notes_url',
+            },
         },
         'servicegroup_num_services': {
             'description': 'The total number of services in the group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: len(item["__servicegroups_services__"]),
             'datatype': int,
+            'projections': [
+                '__servicegroups_hosts__.state',
+                '__servicegroups_hosts__.state_id',
+                '__servicegroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_crit': {
             'description': 'The number of services in the group that are CRIT',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 0, 2),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_hard_crit': {
             'description': 'The number of services in the group that are CRIT',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 1, 2),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_hard_ok': {
             'description': 'The number of services in the group that are OK',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 1, 0),
             'datatype': int,
-        },
-        'servicegroup_num_services_hard_unknown': {
-            'description': 'The number of services in the group that are UNKNOWN',
-            'function': lambda item: 0,  # REPAIRME
-            'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_hard_warn': {
             'description': 'The number of services in the group that are WARN',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 1, 1),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_ok': {
             'description': 'The number of services in the group that are OK',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 0, 0),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_pending': {
             'description': 'The number of services in the group that are PENDING',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", state_id="PENDING"),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_unknown': {
             'description': 'The number of services in the group that are UNKNOWN',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 1, 3),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_num_services_warn': {
             'description': 'The number of services in the group that are WARN',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "servicegroups_services", 0, 1),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'servicegroup_worst_service_state': {
             'description': 'The worst soft state of all of the groups services (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_worst(item, "servicegroups_services", 1),
             'datatype': int,
+            'projections': [
+                '__servicegroups_services__.state',
+                '__servicegroups_services__.state_id',
+                '__servicegroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
     },
     'Servicesbyhostgroup': {
+        'groups': {
+            'description': 'A list of all host groups this service is in',
+            'function': lambda item: item["hostgroups"],
+            'datatype': list,
+            'filters': {
+                'attr': 'hostgroups',
+            },
+        },
+        'hostgroups': {
+            'description': 'A list of all host groups this service is in',
+            'function': lambda item: item["hostgroups"],
+            'datatype': list,
+            'filters': {
+                'attr': 'hostgroups',
+            },
+        },
         'hostgroup_action_url': {
             'description': 'An optional URL to custom actions or information about the hostgroup',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "hostgroups", "action_url"),
+            'filters': {
+                'attr': '__hostgroups__.action_url',
+            },
         },
         'hostgroup_alias': {
             'description': 'An alias of the hostgroup',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "hostgroups", "alias"),
+            'filters': {
+                'attr': '__hostgroups__.alias',
+            },
         },
         'hostgroup_members': {
             'description': 'A list of all host names that are members of the hostgroup',
-            'function': lambda item: [],  # REPAIRME
+            'function': lambda item: linked_attr(item, "hostgroups", "members"),
             'datatype': list,
+            'filters': {
+                'attr': '__hostgroups__.members',
+            },
         },
         'hostgroup_members_with_state': {
             'description': 'A list of all host names that are members of the hostgroup together with state and has_been_checked',
@@ -3959,105 +4058,222 @@ livestatus_attribute_map = {
         },
         'hostgroup_name': {
             'description': 'Name of the hostgroup',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "hostgroups", "hostgroup_name"),
+            'filters': {
+                'attr': '__hostgroups__.hostgroup_name',
+            },
         },
         'hostgroup_notes': {
             'description': 'Optional notes to the hostgroup',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "hostgroups", "notes"),
+            'filters': {
+                'attr': '__hostgroups__.notes',
+            },
         },
         'hostgroup_notes_url': {
             'description': 'An optional URL with further information about the hostgroup',
-            'function': lambda item: "",  # REPAIRME
+            'function': lambda item: linked_attr(item, "hostgroups", "notes_url"),
+            'filters': {
+                'attr': '__hostgroups__.notes_url',
+            },
         },
         'hostgroup_num_hosts': {
             'description': 'The total number of hosts in the group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: len(item["__hostgroups_hosts__"]),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.host_name',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_hosts_down': {
             'description': 'The number of hosts in the group that are down',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_hosts", 1, 1),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.state',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_hosts_pending': {
             'description': 'The number of hosts in the group that are pending',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_hosts", state_id="PENDING"),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.state',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_hosts_unreach': {
             'description': 'The number of hosts in the group that are unreachable',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_hosts", 1, 2),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.state',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_hosts_up': {
             'description': 'The number of hosts in the group that are up',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_hosts", 1, 0),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.state',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services': {
             'description': 'The total number of services of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: len(item["__hostgroups_services__"]),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.state',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_crit': {
             'description': 'The total number of services with the state CRIT of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 0, 2),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_hard_crit': {
             'description': 'The total number of services with the state CRIT of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 1, 2),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_hard_ok': {
             'description': 'The total number of services with the state OK of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 1, 0),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_hard_unknown': {
             'description': 'The total number of services with the state UNKNOWN of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 1, 3),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_hard_warn': {
             'description': 'The total number of services with the state WARN of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 1, 1),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_ok': {
             'description': 'The total number of services with the state OK of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 0, 0),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_pending': {
             'description': 'The total number of services with the state Pending of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", state_id="PENDING"),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_unknown': {
             'description': 'The total number of services with the state UNKNOWN of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 0, 3),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_num_services_warn': {
             'description': 'The total number of services with the state WARN of hosts in this group',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_count(item, "hostgroups_services", 0, 1),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_worst_host_state': {
             'description': 'The worst state of all of the groups\' hosts (UP <= UNREACHABLE <= DOWN)',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_worst(item, "hostgroups_hosts", 1),
             'datatype': int,
+            'projections': [
+                '__hostgroups_hosts__.state',
+                '__hostgroups_hosts__.state_id',
+                '__hostgroups_hosts__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_worst_service_hard_state': {
             'description': 'The worst state of all services that belong to a host of this group (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_worst(item, "hostgroups_services", 1),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
         'hostgroup_worst_service_state': {
             'description': 'The worst state of all services that belong to a host of this group (OK <= WARN <= UNKNOWN <= CRIT)',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: state_worst(item, "hostgroups_services", 0),
             'datatype': int,
+            'projections': [
+                '__hostgroups_services__.state',
+                '__hostgroups_services__.state_id',
+                '__hostgroups_services__.state_type_id'
+            ],
+            'filters': {}
         },
     },
     'Config': {
@@ -4952,27 +5168,32 @@ livestatus_attribute_map = {
 for class_map in ("Comment", "Downtime", "Service"):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["HostLink"]
-    ),
+    )
 for class_map in ("Comment", "Downtime"):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["ServiceLink"]
-    ),
+    )
 for class_map in ('Host', 'Hostgroup', 'Servicegroup'):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["ServicesLink"]
-    ),
+    )
 for class_map in ('Hostgroup', 'Servicegroup'):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["HostsLink"]
-    ),
+    )
 for class_map in ("Hostsbygroup",):
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["Host"]
-    ),
+    )
 for class_map in ("Servicesbygroup", "Servicesbyhostgroup"):
+    # The group parameter semantic can be different is some tables
+    # We keep the more specialized version
+    groups = livestatus_attribute_map[class_map].get('groups')
     livestatus_attribute_map[class_map].update(
         livestatus_attribute_map["Service"]
-    ),
+    )
+    if groups is not None:
+        livestatus_attribute_map[class_map]['groups'] = groups
 
 table_class_map = {
     'hosts': livestatus_attribute_map['Host'],

@@ -771,7 +771,6 @@ OutputFormat: python
 
         self.execute_and_assert(query, assert_column_count)
 
-
     def test_hostsbyroup(self):
         self.print_header()
         now = time.time()
@@ -786,12 +785,16 @@ OutputFormat: python
         query = """GET hostsbygroup
 Columns: name hostgroup_name hostgroup_alias hostgroup_num_hosts_up hostgroup_num_services_warn hostgroup_num_services_hard_unknown hostgroup_num_services hostgroup_num_services_crit hostgroup_num_hosts_pending hostgroup_num_hosts_down hostgroup_num_services_hard_crit hostgroup_num_services_hard_warn hostgroup_num_services_unknown hostgroup_num_services_pending hostgroup_num_hosts hostgroup_num_services_ok hostgroup_num_services_hard_ok hostgroup_num_hosts_unreach
 Filter: groups >= hostgroup_01
+Filter: groups >= hostgroup_02
+Or: 2
 OutputFormat: python
 """
 
         expected_result = [
             ['test_host_000', 'hostgroup_01', 'hostgroup_alias_01', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
             ['test_host_005', 'hostgroup_01', 'hostgroup_alias_01', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_001', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_006', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0]
         ]
 
         self.execute_and_assert(query, expected_result)
@@ -813,9 +816,118 @@ OutputFormat: python
         expected_result = [
             ['test_host_000', 'hostgroup_01', 'hostgroup_alias_01', 1, 1, 1, 40, 1, 0, 0, 2, 2, 0, 0, 2, 0, 33, 0],
             ['test_host_005', 'hostgroup_01', 'hostgroup_alias_01', 1, 1, 1, 40, 1, 0, 0, 2, 2, 0, 0, 2, 0, 33, 0],
+            ['test_host_001', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_006', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0]
         ]
 
         self.execute_and_assert(query, expected_result)
+
+    def test_servicesbygroup(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+
+        query = """GET servicesbygroup
+Columns: host_name name description servicegroup_name servicegroup_alias servicegroup_num_services_warn servicegroup_num_services_hard_unknown servicegroup_num_services servicegroup_num_services_crit servicegroup_num_services_hard_crit servicegroup_num_services_hard_warn servicegroup_num_services_unknown servicegroup_num_services_pending servicegroup_num_hosts servicegroup_num_services_ok servicegroup_num_services_hard_ok servicegroup_num_hosts_unreach
+Filter: groups >= servicegroup_01
+Filter: groups >= servicegroup_02
+Or: 2
+OutputFormat: python
+"""
+
+
+        expected_result = [
+         ['test_host_005', 'test_critical_11', 'servicegroup_02', 'servicegroup_alias_02', 0, 40, 0, 0, 0, 0, 0, 0, 40],
+        ]
+
+        def assert_servicegroups(result):
+            self.assertEqual(len(result), 80)
+            for r in expected_result:
+                self.assertIn(r, result)
+
+        self.execute_and_assert(query, assert_servicegroups)
+
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_01")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_05")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_10")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_15")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
+
+        host = self.sched.hosts.find_by_name("test_host_005")
+        self.scheduler_loop(1, [[host, 1, 'DOWN']])
+        self.update_broker()
+
+        expected_result = [
+            ['test_host_005', 'test_critical_11', 'servicegroup_02', 'servicegroup_alias_02', 0, 40, 1, 1, 1, 0, 0, 0, 37],
+        ]
+
+        self.execute_and_assert(query, assert_servicegroups)
+
+    def test_servicesbyhostroup(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+
+        query = """GET servicesbyhostgroup
+Columns: host_name name description hostgroup_name hostgroup_alias hostgroup_num_hosts_up hostgroup_num_services_warn hostgroup_num_services_hard_unknown hostgroup_num_services hostgroup_num_services_crit hostgroup_num_hosts_pending hostgroup_num_hosts_down hostgroup_num_services_hard_crit hostgroup_num_services_hard_warn hostgroup_num_services_unknown hostgroup_num_services_pending hostgroup_num_hosts hostgroup_num_services_ok hostgroup_num_services_hard_ok hostgroup_num_hosts_unreach
+Filter: groups >= hostgroup_01
+Filter: groups >= hostgroup_02
+Or: 2
+OutputFormat: python
+"""
+
+        expected_result = [
+            ['test_host_000', 'test_critical_03', 'hostgroup_01', 'hostgroup_alias_01', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_005', 'test_critical_11', 'hostgroup_01', 'hostgroup_alias_01', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_001', 'test_flap_12', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_006', 'test_flap_08', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0]
+        ]
+
+        def assert_hostgroups(result):
+            self.assertEqual(len(result), 80)
+            for r in expected_result:
+                self.assertIn(r, result)
+
+        self.execute_and_assert(query, assert_hostgroups)
+
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_13")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_03")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_unknown_08")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_06")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_flap_09")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
+
+        host = self.sched.hosts.find_by_name("test_host_005")
+        self.scheduler_loop(1, [[host, 1, 'DOWN']])
+        self.update_broker()
+
+        expected_result = [
+            ['test_host_000', 'test_critical_03', 'hostgroup_01', 'hostgroup_alias_01', 1, 1, 1, 40, 1, 0, 0, 2, 2, 0, 0, 2, 0, 33, 0],
+            ['test_host_005', 'test_critical_11', 'hostgroup_01', 'hostgroup_alias_01', 1, 1, 1, 40, 1, 0, 0, 2, 2, 0, 0, 2, 0, 33, 0],
+            ['test_host_001', 'test_flap_12', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0],
+            ['test_host_006', 'test_flap_08', 'hostgroup_02', 'hostgroup_alias_02', 2, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 2, 0, 40, 0]
+        ]
+
+        self.execute_and_assert(query, assert_hostgroups)
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01

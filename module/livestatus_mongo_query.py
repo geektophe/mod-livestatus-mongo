@@ -481,9 +481,9 @@ class LiveStatusMongoQuery(object):
         hostgroup attributes.
         """
         if self.mongo_stats_filters:
-            return self.execute_aggregation_query("services", "servicegroups")
+            return self.execute_aggregation_query("servicesbygroup", "servicegroups")
         else:
-            return self.execute_filter_query("services", "servicegroups")
+            return self.execute_filter_query("servicesbygroup", "servicegroups")
 
     def get_servicesbyhostgroup_livedata(self):
         """
@@ -493,7 +493,7 @@ class LiveStatusMongoQuery(object):
         if self.mongo_stats_filters:
             return self.execute_aggregation_query("services", "hostgroups")
         else:
-            return self.execute_filter_query("services", "hostgroups")
+            return self.execute_filter_query("servicesbyhostgroup", "hostgroups")
 
 
     def get_list_livedata(self, cs):
@@ -512,7 +512,7 @@ class LiveStatusMongoQuery(object):
             ) if cs.filter_func(c)]
         return res
 
-    def get_group_livedata(self, cs, objs, groupattr1, groupattr2, sorter):
+    def _get_group_livedata(self, cs, objs, groupattr1, groupattr2, sorter):
         """
         return a list of elements from a "group" of 'objs'. group can be a hostgroup or a servicegroup.
         if an element of objs (a host or a service) is member of groups
@@ -540,7 +540,7 @@ class LiveStatusMongoQuery(object):
         sorter = lambda k: k.hostgroup.hostgroup_name
         return self.get_group_livedata(cs, self.get_table("hosts").__itersorted__(self.metainfo.query_hints), 'hostgroups', 'hostgroup', sorter)
 
-    def get_servicesbygroup_livedata(self, cs):
+    def _get_servicesbygroup_livedata(self, cs):
         sorter = lambda k: k.servicegroup.servicegroup_name
         return self.get_group_livedata(cs, self.get_table("services").__itersorted__(self.metainfo.query_hints), 'servicegroups', 'servicegroup', sorter)
 
@@ -597,7 +597,7 @@ class LiveStatusMongoQuery(object):
         self.columns = ['description', 'name', 'table', 'type']
         return result
 
-    def get_servicesbyhostgroup_livedata(self, cs):
+    def _get_servicesbyhostgroup_livedata(self, cs):
         objs = self.get_table("services").__itersorted__(self.metainfo.query_hints)
         return sorted([x for x in (
             setattr(svchgrp[0], 'hostgroup', svchgrp[1]) or svchgrp[0] for svchgrp in (

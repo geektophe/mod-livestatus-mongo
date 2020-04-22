@@ -291,7 +291,7 @@ class DataManager(object):
                 },
             ])
             for service in services:
-                members_services.append(service["_id"])
+                members.append(service["_id"])
                 contacts.extend(service.get("contacts", []))
                 members_hosts.append(service["host_name"])
                 hname = service["host_name"]
@@ -1328,7 +1328,7 @@ class DataManager(object):
             })
         return lookup
 
-    get_mongo_aggregation_lookup_servicesygroup = get_mongo_aggregation_lookup_hostsbygroup
+    get_mongo_aggregation_lookup_servicesbyhostgroup = get_mongo_aggregation_lookup_hostsbygroup
 
     def get_filter_query(self, table, stack):
         """
@@ -1471,13 +1471,13 @@ class DataManager(object):
                 pipeline.append(
                     {"$sort": {sort: 1}}
                 )
-            elif groupby is not None:
-                pipeline.append(
-                    {"$sort": {groupby: 1, "_id": 1}}
-                )
             else:
                 pipeline.append(
                     {"$sort": {"_id": 1}}
+                )
+            if groupby is not None:
+                pipeline.append(
+                    {"$sort": {groupby: 1}}
                 )
             print("find(): aggregation pipeline:")
             pprint(pipeline)
