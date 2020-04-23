@@ -316,7 +316,6 @@ class DataManager(object):
                 {"$set": {"servicegroups": list(set(servicegroups))}},
             )
 
-
     def manage_update_program_status_brok(self, brok):
         """
         Display brok content
@@ -1142,7 +1141,7 @@ class DataManager(object):
             [(p, 1) for p in projections]
         )
 
-    def get_mongo_aggregation_lookup_hosts(self, pipeline, projections):
+    def get_mongo_lookup_hosts(self, pipeline, projections):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1153,18 +1152,20 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         if not projections or any([p.startswith("__services__") for p in projections]):
-            return [{
-                "$lookup": {
-                    "from": "services",
-                    "localField": "host_name",
-                    "foreignField": "host_name",
-                    "as": "__services__",
+            return [
+                {
+                    "$lookup": {
+                        "from": "services",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
+                        "as": "__services__",
+                    },
                 }
-            }]
+            ]
         else:
             return []
 
-    def get_mongo_aggregation_lookup_services(self, pipeline, projections):
+    def get_mongo_lookup_services(self, pipeline, projections):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1174,19 +1175,22 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        if not projections or any([p.startswith("__hosts__") for p in projections]):
-            return [{
-                "$lookup": {
-                    "from": "hosts",
-                    "localField": "host_name",
-                    "foreignField": "host_name",
-                    "as": "__hosts__",
-                }
-            }]
+        if not projections or any([p.startswith("__host__") for p in projections]):
+            return [
+                {
+                    "$lookup": {
+                        "from": "hosts",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
+                        "as": "__host__",
+                    },
+                },
+                {"$unwind": "$__host__"},
+            ]
         else:
             return []
 
-    def get_mongo_aggregation_lookup_hostgroups(self, pipeline, projections):
+    def get_mongo_lookup_hostgroups(self, pipeline, projections):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1217,7 +1221,7 @@ class DataManager(object):
             })
         return lookup
 
-    def get_mongo_aggregation_lookup_servicegroups(self, pipeline, projections):
+    def get_mongo_lookup_servicegroups(self, pipeline, projections):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1248,7 +1252,7 @@ class DataManager(object):
             })
         return lookup
 
-    def get_mongo_aggregation_lookup_hostsbygroup(self, pipeline, projections):
+    def get_mongo_lookup_hostsbygroup(self, pipeline, projections):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1259,36 +1263,39 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projections or any([p.startswith("__hostgroups__") for p in projections]):
-            lookup.append({
-                "$lookup": {
-                    "from": "hostgroups",
-                    "localField": "hostgroups",
-                    "foreignField": "hostgroup_name",
-                    "as": "__hostgroups__",
-                }
-            })
-        if not projections or any([p.startswith("__hostgroups_hosts__") for p in projections]):
+        if not projections or any([p.startswith("__hostgroup__") for p in projections]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hostgroups",
+                        "localField": "hostgroups",
+                        "foreignField": "hostgroup_name",
+                        "as": "__hostgroup__",
+                    }
+                },
+                {"$unwind": "$__hostgroup__"},
+            ])
+        if not projections or any([p.startswith("__hostgroup_hosts__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "hostgroups",
                     "foreignField": "hostgroups",
-                    "as": "__hostgroups_hosts__",
+                    "as": "__hostgroup_hosts__",
                 }
             })
-        if not projections or any([p.startswith("__hostgroups_services__") for p in projections]):
+        if not projections or any([p.startswith("__hostgroup_services__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "hostgroups",
                     "foreignField": "hostgroups",
-                    "as": "__hostgroups_services__",
+                    "as": "__hostgroup_services__",
                 }
             })
         return lookup
 
-    def get_mongo_aggregation_lookup_servicesbygroup(self, pipeline, projections):
+    def get_mongo_lookup_servicesbygroup(self, pipeline, projections):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1299,36 +1306,39 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projections or any([p.startswith("__servicegroups__") for p in projections]):
-            lookup.append({
-                "$lookup": {
-                    "from": "servicegroups",
-                    "localField": "servicegroups",
-                    "foreignField": "servicegroup_name",
-                    "as": "__servicegroups__",
-                }
-            })
-        if not projections or any([p.startswith("__servicegroups_hosts__") for p in projections]):
+        if not projections or any([p.startswith("__servicegroup__") for p in projections]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "servicegroups",
+                        "localField": "servicegroups",
+                        "foreignField": "servicegroup_name",
+                        "as": "__servicegroup__",
+                    }
+                },
+                {"$unwind": "$__servicegroup__"}
+            ])
+        if not projections or any([p.startswith("__servicegroup_hosts__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "servicegroups",
                     "foreignField": "servicegroups",
-                    "as": "__servicegroups_hosts__",
+                    "as": "__servicegroup_hosts__",
                 }
             })
-        if not projections or any([p.startswith("__servicegroups_services__") for p in projections]):
+        if not projections or any([p.startswith("__servicegroup_services__") for p in projections]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "servicegroups",
                     "foreignField": "servicegroups",
-                    "as": "__servicegroups_services__",
+                    "as": "__servicegroup_services__",
                 }
             })
         return lookup
 
-    get_mongo_aggregation_lookup_servicesbyhostgroup = get_mongo_aggregation_lookup_hostsbygroup
+    get_mongo_lookup_servicesbyhostgroup = get_mongo_lookup_hostsbygroup
 
     def get_filter_query(self, table, stack):
         """
@@ -1437,7 +1447,7 @@ class DataManager(object):
         pprint(columns)
 
         # Check if another collection lookup is necessary
-        get_lookup_fct_name = "get_mongo_aggregation_lookup_%s" % table
+        get_lookup_fct_name = "get_mongo_lookup_%s" % table
         print("find(): get_lookup_fct_name: %s" % get_lookup_fct_name)
         get_lookup_fct = getattr(self, get_lookup_fct_name, None)
 
@@ -1446,7 +1456,6 @@ class DataManager(object):
         else:
             lookup = []
 
-        print("find(): groupby: %s" % groupby)
         # If another collection $lookup is necessary, use an aggregation
         # rather than a search
         if lookup or groupby:

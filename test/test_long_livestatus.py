@@ -886,8 +886,8 @@ OutputFormat: python
 
         query = """GET servicesbyhostgroup
 Columns: host_name name description hostgroup_name hostgroup_alias hostgroup_num_hosts_up hostgroup_num_services_warn hostgroup_num_services_hard_unknown hostgroup_num_services hostgroup_num_services_crit hostgroup_num_hosts_pending hostgroup_num_hosts_down hostgroup_num_services_hard_crit hostgroup_num_services_hard_warn hostgroup_num_services_unknown hostgroup_num_services_pending hostgroup_num_hosts hostgroup_num_services_ok hostgroup_num_services_hard_ok hostgroup_num_hosts_unreach
-Filter: groups >= hostgroup_01
-Filter: groups >= hostgroup_02
+Filter: hostgroups >= hostgroup_01
+Filter: hostgroups >= hostgroup_02
 Or: 2
 OutputFormat: python
 """
@@ -928,6 +928,14 @@ OutputFormat: python
         ]
 
         self.execute_and_assert(query, assert_hostgroups)
+
+
+
+
+
+
+
+
 
     def _test_worst_service_state(self):
         # test_host_005 is in hostgroup_01
