@@ -488,6 +488,7 @@ class DataManager(object):
         :rtype: str
         :return: The attribute name to use in mongo query
         """
+        print("get_mongo_attribute_name(): table: %s" % table)
         mapping = table_class_map[table][attribute]
         # Special case, if mapping is {}, no filtering is supported on this
         # attribute
@@ -506,7 +507,7 @@ class DataManager(object):
         """
         return table_class_map[table][attribute].get("datatype")
 
-    def add_filter_eq(self, stack, table, attribute, reference):
+    def add_filter_eq(self, stack, table, attribute, reference, ignore_type=False):
         """
         Transposes an equalitiy operator filter into a mongo query
 
@@ -517,11 +518,11 @@ class DataManager(object):
         """
         attrname = self.get_mongo_attribute_name(table, attribute)
         attrtype = self.get_mongo_attribute_type(table, attribute)
-        if attrtype is list:
+        if attrtype is list and ignore_type is False:
             stack.append({
                 attrname: []
             })
-        elif attrtype is not None:
+        elif attrtype is not None and ignore_type is False:
             stack.append({
                 attrname: {
                     "$eq": attrtype(reference)
@@ -533,6 +534,22 @@ class DataManager(object):
                     "$eq": reference
                 }
             })
+
+    def add_filter_eqeq(self, stack, table, attribute, reference, ignore_type=False):
+        """
+        Transposes a generic equalitiy operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        stack.append({
+            attrname: {
+                "$eq": reference
+            }
+        })
 
     def add_filter_eq_ci(self, stack, table, attribute, reference):
         """
@@ -707,6 +724,20 @@ class DataManager(object):
                 attrname: {"$gte": reference}
             })
 
+    def add_filter_in(self, stack, table, attribute, reference):
+        """
+        Transposes an in operator filter into a mongo query
+
+        :param list stack: The stack to append filter to
+        :param str table: The table the attribute is in
+        :param str attribute: The attribute name to compare
+        :param str reference: The reference value to compare to
+        """
+        attrname = self.get_mongo_attribute_name(table, attribute)
+        stack.append({
+            attrname: {"$in": [reference]}
+        })
+
     def add_filter_not_eq(self, stack, table, attribute, reference):
         """
         Transposes a not equal  operator filter into a mongo query
@@ -839,6 +870,12 @@ class DataManager(object):
             }
         })
 
+    grouping_tables = {
+        "hostsbygroup": "hostgroups",
+        "servicesbygroup": "servicegroups",
+        "servicesbyhostgroup": "hostgroups",
+    }
+
     def add_aggregation_sum(self, stack, table, attribute, reference=None):
         """
         Transposes a stats sum aggregation into a mongo query
@@ -849,22 +886,43 @@ class DataManager(object):
         :param str reference: The reference value to compare to
         """
         attrname = self.get_mongo_attribute_name(table, attribute)
-        stack.append([
-            {
-                "$group": {
-                    "_id": None,
-                    "result": {
-                        "$sum": "$%s" % attrname
-                    }
+        if table in self.grouping_tables:
+            groupby = self.grouping_tables[table]
+            stack.append([
+                {"$unwind": "$%s" % groupby},
+                {
+                    "$group": {
+                        "_id": "$%s" % groupby,
+                        "result": {
+                            "$sum": "$%s" % attrname
+                        },
+                    },
                 },
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "result": 1
+                {
+                    "$project": {
+                        "_id": 0,
+                        "group": "$_id",
+                        "result": 1,
+                    }
                 }
-            }
-        ])
+            ])
+        else:
+            stack.append([
+                {
+                    "$group": {
+                        "_id": None,
+                        "result": {
+                            "$sum": "$%s" % attrname
+                        }
+                    },
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "result": 1
+                    }
+                }
+            ])
 
     def add_aggregation_max(self, stack, table, attribute, reference=None):
         """
@@ -876,22 +934,42 @@ class DataManager(object):
         :param str reference: The reference value to compare to
         """
         attrname = self.get_mongo_attribute_name(table, attribute)
-        stack.append([
-            {
-                "$group": {
-                    "_id": None,
-                    "result": {
-                        "$max": "$%s" % attrname
-                    }
+        if table in self.grouping_tables:
+            groupby = self.grouping_tables[table]
+            stack.append([
+                {
+                    "$group": {
+                        "_id": "$%s" % groupby,
+                        "result": {
+                            "$max": "$%s" % attrname
+                        }
+                    },
                 },
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "result": 1
+                {
+                    "$project": {
+                        "_id": 0,
+                        "group": "$_id",
+                        "result": 1,
+                    }
                 }
-            }
-        ])
+            ])
+        else:
+            stack.append([
+                {
+                    "$group": {
+                        "_id": None,
+                        "result": {
+                            "$max": "$%s" % attrname
+                        }
+                    },
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "result": 1
+                    }
+                }
+            ])
 
     def add_aggregation_min(self, stack, table, attribute, reference=None):
         """
@@ -903,22 +981,42 @@ class DataManager(object):
         :param str reference: The reference value to compare to
         """
         attrname = self.get_mongo_attribute_name(table, attribute)
-        stack.append([
-            {
-                "$group": {
-                    "_id": "$item",
-                    "result": {
-                        "$min": "$%s" % attrname
-                    }
+        if table in self.grouping_tables:
+            groupby = self.grouping_tables[table]
+            stack.append([
+                {
+                    "$group": {
+                        "_id": "$%s" % groupby,
+                        "result": {
+                            "$min": "$%s" % attrname
+                        }
+                    },
                 },
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "result": 1
+                {
+                    "$project": {
+                        "_id": 0,
+                        "group": "$_id",
+                        "result": 1,
+                    }
                 }
-            }
-        ])
+            ])
+        else:
+            stack.append([
+                {
+                    "$group": {
+                        "_id": "$item",
+                        "result": {
+                            "$min": "$%s" % attrname
+                        }
+                    },
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "result": 1
+                    }
+                }
+            ])
 
     def add_aggregation_avg(self, stack, table, attribute, reference=None):
         """
@@ -930,24 +1028,44 @@ class DataManager(object):
         :param str reference: The reference value to compare to
         """
         attrname = self.get_mongo_attribute_name(table, attribute)
-        stack.append([
-            {
-                "$group": {
-                    "_id": None,
-                    "result": {
-                        "$avg": "$%s" % attrname
-                    }
+        if table in self.grouping_tables:
+            groupby = self.grouping_tables[table]
+            stack.append([
+                {
+                    "$group": {
+                        "_id": "$%s" % groupby,
+                        "result": {
+                            "$avg": "$%s" % attrname
+                        }
+                    },
                 },
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "result": 1
+                {
+                    "$project": {
+                        "_id": 0,
+                        "group": "$_id",
+                        "result": 1,
+                    }
                 }
-            }
-        ])
+            ])
+        else:
+            stack.append([
+                {
+                    "$group": {
+                        "_id": None,
+                        "result": {
+                            "$avg": "$%s" % attrname
+                        }
+                    },
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "result": 1
+                    }
+                }
+            ])
 
-    def add_aggregation_count(self, stack, attribute=None, reference=None):
+    def add_aggregation_count(self, stack, table, attribute=None, reference=None):
         """
         Transposes a stats count aggregation into a mongo query
 
@@ -956,22 +1074,43 @@ class DataManager(object):
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
         """
-        stack.append([
-            {
-                "$group": {
-                    "_id": None,
-                    "result": {
-                        "$sum": 1
+        if table in self.grouping_tables:
+            groupby = self.grouping_tables[table]
+            stack.append([
+                {
+                    "$group": {
+                        "_id": "$%s" % groupby,
+                        "result": {
+                            "$sum": 1
+                        }
+                    },
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "group": "$_id",
+                        "result": 1,
                     }
                 },
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "result": 1
+                {"$sort": {"group": 1}}
+            ])
+        else:
+            stack.append([
+                {
+                    "$group": {
+                        "_id": None,
+                        "result": {
+                            "$sum": 1
+                        }
+                    },
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "result": 1
+                    }
                 }
-            }
-        ])
+            ])
 
     def stack_filter_and(self, stack, table, count):
         """
@@ -1263,6 +1402,17 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
+        if not projections or any([p.startswith("__services__") for p in projections]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "services",
+                        "localField": "host_name",
+                        "foreignField": "host_name_name",
+                        "as": "__services__",
+                    }
+                },
+            ])
         if not projections or any([p.startswith("__hostgroup__") for p in projections]):
             lookup.extend([
                 {
@@ -1306,6 +1456,18 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
+        if not projections or any([p.startswith("__host__") for p in projections]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hosts",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
+                        "as": "__host__",
+                    }
+                },
+                {"$unwind": "$__host__"}
+            ])
         if not projections or any([p.startswith("__servicegroup__") for p in projections]):
             lookup.extend([
                 {
@@ -1338,7 +1500,60 @@ class DataManager(object):
             })
         return lookup
 
-    get_mongo_lookup_servicesbyhostgroup = get_mongo_lookup_hostsbygroup
+    def get_mongo_lookup_servicesbyhostgroup(self, pipeline, projections):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projections: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projections or any([p.startswith("__host__") for p in projections]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hosts",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
+                        "as": "__host__",
+                    }
+                },
+                {"$unwind": "$__host__"}
+            ])
+        if not projections or any([p.startswith("__hostgroup__") for p in projections]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hostgroups",
+                        "localField": "hostgroups",
+                        "foreignField": "hostgroup_name",
+                        "as": "__hostgroup__",
+                    }
+                },
+                {"$unwind": "$__hostgroup__"}
+            ])
+        if not projections or any([p.startswith("__hostgroup_hosts__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "hosts",
+                    "localField": "hostgroups",
+                    "foreignField": "hostgroups",
+                    "as": "__hostgroup_hosts__",
+                }
+            })
+        if not projections or any([p.startswith("__hostgroup_services__") for p in projections]):
+            lookup.append({
+                "$lookup": {
+                    "from": "services",
+                    "localField": "hostgroups",
+                    "foreignField": "hostgroups",
+                    "as": "__hostgroup_services__",
+                }
+            })
+        return lookup
 
     def get_filter_query(self, table, stack):
         """
@@ -1358,7 +1573,7 @@ class DataManager(object):
             query = {}
         return query
 
-    def get_aggregation_query(self, table, filter_query, query):
+    def get_aggregation_query(self, table, filter_query, query, groupby=None):
         """
         Generates the final aggregation query from the list of queries in
         mongo_stats_filters
@@ -1367,6 +1582,7 @@ class DataManager(object):
         :param dict filter_query: The initial filter query limitting the
                                   aggregation scope
         :param list,dict query: The aggregation/stats query
+        :param str groupby: Should the aggregation be done against group of objects
         :rtype: list
         :return: The aggregation query
         """
@@ -1379,7 +1595,7 @@ class DataManager(object):
             # The query is a stat filter, and needs to be enclosed in a count
             # aggregation
             stack = []
-            self.add_aggregation_count(stack)
+            self.add_aggregation_count(stack, table)
             aggregation_query = stack.pop()
             if filter_query:
                 aggregation_query.insert(0, {
@@ -1395,6 +1611,15 @@ class DataManager(object):
                     "$match": query
                 })
             query = aggregation_query
+        if groupby is not None:
+            # If a the aggregation is a groupby query, then unwind the
+            # aggregated field, and re match the resulting objects to
+            # filter out objects not matching the criteria
+            match = query[0]
+            query.insert(0, {
+                "$unwind": "$%s" % groupby,
+            })
+            query.insert(0, match)
         return query
 
     def filter_query_columns(self, table, columns):
@@ -1510,7 +1735,7 @@ class DataManager(object):
         :rtype: iterator
         :return: The query result
         """
-        collection = getattr(self.db, table)
+        collection = self.get_collection(table)
         return collection.count(query)
 
     def aggregate(self, table, query):
@@ -1520,7 +1745,7 @@ class DataManager(object):
         :rtype: iterator
         :return: The query result
         """
-        collection = getattr(self.db, table)
+        collection = self.get_collection(table)
         return collection.aggregate(query)
 
     # UI will launch us names in str, we got unicode

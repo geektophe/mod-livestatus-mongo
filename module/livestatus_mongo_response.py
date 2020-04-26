@@ -199,8 +199,37 @@ class LiveStatusMongoResponse:
         'python':   (_python_end_row, _format_json_python_value)
     }
 
+    def format_item(self, item, columns):
+        """
+        Format an item returing the requested columns only
+
+        :param dict item: The item to format
+        :param list columns: The requested columns
+        :rtype: list
+        :return: The object's columns
+        """
+        row = []
+        for column in columns:
+            try:
+                mapping = table_class_map[self.query.table][column]
+                attr = mapping.get('filters', {}).get('attr', column)
+                if "function" in mapping:
+                    value = mapping["function"](item)
+                elif "datatype" in mapping:
+                        datatype = mapping["datatype"]
+                        default = datatype()
+                        value = item.get(attr, default)
+                        value = datatype(value)
+                else:
+                    value = item.get(attr, "")
+                row.append(value)
+            except:
+                print("failed to map value %s to [%s]: %s" % (column, mapping["datatype"], value))
+                raise
+        return row
+
     def format_live_data_items(self, result, columns, aliases):
-        if not columns:
+        if columns is None:
             columns = table_class_map[self.query.table].keys()
             # There is no pre-selected list of columns. In this case
             # we output all columns.
@@ -219,23 +248,8 @@ class LiveStatusMongoResponse:
         rows = []
         if showheader:
             rows.append(headers)
-
         for item in result:
-            row = []
-            for column in columns:
-                mapping = table_class_map[self.query.table][column]
-                if "function" in mapping:
-                    value = mapping["function"](item)
-                else:
-                    value = item[column]
-                if "datatype" in mapping:
-                    try:
-                        value = mapping["datatype"](value)
-                    except:
-                        print("failed to map value %s to [%s]: %s" % (column, mapping["datatype"], value))
-                        raise
-                row.append(value)
-            rows.append(row)
+            rows.append(self.format_item(item, columns))
         if self.outputformat == "json":
             return json.dumps(rows)
         if self.outputformat.startswith("python"):
@@ -250,17 +264,36 @@ class LiveStatusMongoResponse:
             return f.getvalue()
 
     def format_live_data_stats(self, result, columns, aliases):
+        if columns is None:
+            columns = table_class_map[self.query.table].keys()
+            # There is no pre-selected list of columns. In this case
+            # we output all columns.
+        stats = []
+        for row in result:
+            item = row.pop(0)
+            # If the stats query is a against the {host,service}byXXX table,
+            # the first element of the result is the stats for a group.
+            # If columns are requested, the group object has been previously
+            # extracted and can be formatted.
+            # If no column is requested, only the group name is displayed
+            # If it's not a grouping stats query, the first element is ignored
+            if isinstance(item, dict):
+                row = self.format_item(item, columns) + row
+                stats.extend(row)
+            elif item is not None:
+                row.insert(0, item)
+            stats.append(row)
         if self.outputformat == "json":
-            return json.dumps(result)
+            return json.dumps(stats)
         elif self.outputformat.startswith("python"):
-            return repr(result)
+            return repr(stats)
         else:
             f = StringIO()
             writer = csv.writer(f,
                 delimiter=self.separators.field,
                 lineterminator=self.separators.line
             )
-            writer.writerow(result)
+            writer.writerow(stats)
             return f.getvalue()
 
     def format_live_data(self, result, columns, aliases):
