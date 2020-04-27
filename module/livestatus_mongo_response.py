@@ -26,6 +26,7 @@
 from types import GeneratorType
 from collections import namedtuple
 from mongo_mapping import table_class_map
+from livestatus_mongo_datamanager import datamgr
 
 import csv
 import json
@@ -223,12 +224,14 @@ class LiveStatusMongoResponse:
                 else:
                     value = item.get(attr, "")
                 row.append(value)
-            except:
-                print("failed to map value %s to [%s]: %s" % (column, mapping["datatype"], value))
+            except Exception as e:
+                print("failed to map value %s/%s to: %s" % (
+                    self.query.table, column, e)
+                )
                 raise
         return row
 
-    def format_live_data_items(self, result, columns, aliases):
+    def format_live_data_items(self, results, columns, aliases):
         if columns is None:
             columns = table_class_map[self.query.table].keys()
             # There is no pre-selected list of columns. In this case
@@ -242,13 +245,13 @@ class LiveStatusMongoResponse:
             showheader = self.columnheaders == 'on'
         else: # csv has a somehow more complicated showheader rule than json or python..
             showheader = (
-                result and self.columnheaders == 'on'
-                or (not result and (self.columnheaders != 'off' or not columns)))
+                results and self.columnheaders == 'on'
+                or (not results and (self.columnheaders != 'off' or not columns)))
 
         rows = []
         if showheader:
             rows.append(headers)
-        for item in result:
+        for item in results:
             rows.append(self.format_item(item, columns))
         if self.outputformat == "json":
             return json.dumps(rows)
@@ -263,48 +266,43 @@ class LiveStatusMongoResponse:
             writer.writerow(rows)
             return f.getvalue()
 
-    def format_live_data_stats(self, result, columns, aliases):
-        if columns is None:
-            columns = table_class_map[self.query.table].keys()
-            # There is no pre-selected list of columns. In this case
-            # we output all columns.
-        stats = []
-        for row in result:
-            item = row.pop(0)
-            # If the stats query is a against the {host,service}byXXX table,
-            # the first element of the result is the stats for a group.
-            # If columns are requested, the group object has been previously
-            # extracted and can be formatted.
-            # If no column is requested, only the group name is displayed
-            # If it's not a grouping stats query, the first element is ignored
-            if isinstance(item, dict):
-                row = self.format_item(item, columns) + row
-                stats.extend(row)
-            elif item is not None:
-                row.insert(0, item)
-            stats.append(row)
+    def format_live_data_stats(self, results, columns, aliases):
+        rows = []
+        for result in results:
+            item = result.pop(0)
+            row = []
+            if item is None:
+                pass
+            elif len(item) == 1:
+                row.append(item.values().pop(0))
+            else:
+                for column in columns:
+                    attr = datamgr.get_column_attribute(self.query.table, column)
+                    row.append(item.get(attr, ""))
+            row.extend(result)
+            rows.append(row)
         if self.outputformat == "json":
-            return json.dumps(stats)
+            return json.dumps(rows)
         elif self.outputformat.startswith("python"):
-            return repr(stats)
+            return repr(rows)
         else:
             f = StringIO()
             writer = csv.writer(f,
                 delimiter=self.separators.field,
                 lineterminator=self.separators.line
             )
-            writer.writerow(stats)
+            writer.writerow(rows)
             return f.getvalue()
 
-    def format_live_data(self, result, columns, aliases):
+    def format_live_data(self, results, columns, aliases):
         '''
 
-        :param result:
+        :param results:
         :param columns:
         :param aliases:
         :return:
         '''
         if self.query.stats_query:
-            self.output = self.format_live_data_stats(result, columns, aliases)
+            self.output = self.format_live_data_stats(results, columns, aliases)
         else:
-            self.output = self.format_live_data_items(result, columns, aliases)
+            self.output = self.format_live_data_items(results, columns, aliases)

@@ -381,74 +381,57 @@ class LiveStatusMongoQuery(object):
         """
         return self.datamgr.rg.get_table(table_name)
 
-    def execute_filter_query(self, table=None, groupby=None):
+    def execute_filter_query(self, table=None):
         """
         Execute a filter query
         """
         if table is None:
             table = self.table
         print("Mongo filter query: table: %s" % table)
-        query = mongo_datamgr.get_filter_query(table, self.mongo_filters)
-        pprint(query)
-        return mongo_datamgr.find(
+        query = mongo_datamgr.get_filter_query(
             table,
-            query,
+            self.mongo_filters,
             self.columns,
             self.limit,
-            groupby=groupby
         )
+        pprint(query)
+        return mongo_datamgr.find(table, query)
 
-    def execute_aggregation_query(self, table=None, groupby=None):
+    def execute_aggregation_query(self, table=None):
         """
         Execute an aggregation query
         """
         if table is None:
             table = self.table
         results = {}
-        filter_query = mongo_datamgr.get_filter_query(
-            table,
-            self.mongo_filters
-        )
         # If no aggregation has been
         for i, query in enumerate(self.mongo_stats_filters):
-            query = mongo_datamgr.get_aggregation_query(table, filter_query, query, groupby)
+            query = mongo_datamgr.get_aggregation_query(table, self.mongo_filters, query, self.columns)
             print("Mongo aggregation query: table: %s" % table)
             pprint(query)
             for result in mongo_datamgr.aggregate(table, query):
                 print("Aggregation result")
                 pprint(result)
-                if groupby is None:
-                    group = results.setdefault(None, {})
+                if result["group"] is None:
+                    group = results.setdefault(
+                        None,
+                        {"group": None, "stats": {}}
+                    )
                 else:
-                    group = results.setdefault(result["group"], {})
-                group[i] = result["result"]
-
+                    key = "".join([
+                        "%s%s" % (k, v)
+                        for k, v in sorted(result["group"].items())
+                    ])
+                    group = results.setdefault(
+                        key,
+                        {"group": result["group"], "stats": {}}
+                    )
+                group["stats"][i] = result["result"]
         rows = []
-        for group, stats in sorted(results.items(), key=lambda i: i[0]):
-            print("execute_aggregation_query: group %s" % (group))
-            if groupby is not None and self.columns is not None:
-                # If the stats query is a against the {host,service}byXXX table
-                # and columns are requested, looks for the reference
-                # group instance to read column attributes from
-                stack = mongo_datamgr.make_stack()
-                mongo_datamgr.add_filter_eqeq(stack, table, groupby, group)
-                query = stack.pop()
-                groups = mongo_datamgr.find(
-                    table,
-                    query,
-                    self.columns,
-                    limit=1,
-                    groupby=groupby
-                )
-                # groups is an iterator, so we have to walk through even if
-                # there's only one result
-                for item in groups:
-                    break
-                row = [item]
-            else:
-                row = [group]
+        for key, stats in sorted(results.items(), key=lambda r: r[0]):
+            row = [stats["group"]]
             row.extend([
-                stats.get(i, 0)
+                stats["stats"].get(i, 0)
                 for i in range(len(self.mongo_stats_filters))
             ])
             rows.append(row)
@@ -473,9 +456,9 @@ class LiveStatusMongoQuery(object):
         hostgroup attributes.
         """
         if self.mongo_stats_filters:
-            return self.execute_aggregation_query("hostsbygroup", "hostgroups")
+            return self.execute_aggregation_query("hostsbygroup")
         else:
-            return self.execute_filter_query("hostsbygroup", "hostgroups")
+            return self.execute_filter_query("hostsbygroup")
 
     def get_servicesbygroup_livedata(self):
         """
@@ -624,12 +607,12 @@ class LiveStatusMongoQuery(object):
         'timeperiods':          get_filtered_livedata,
         'downtimes':            get_list_livedata,
         'comments':             get_list_livedata,
-        'hostsbygroup':         get_hostsbygroup_livedata,
-        'servicesbygroup':      get_servicesbygroup_livedata,
+        'hostsbygroup':         get_filtered_livedata,
+        'servicesbygroup':      get_filtered_livedata,
         'problems':             get_problem_livedata,
         'status':               get_status_livedata,
         'columns':              get_columns_livedata,
-        'servicesbyhostgroup':  get_servicesbyhostgroup_livedata
+        'servicesbyhostgroup':  get_filtered_livedata
     }
 
     def get_live_data(self):
@@ -1166,7 +1149,10 @@ class LiveStatusMongoQuery(object):
         fct = self.operator_mapping.get(operator)
         # Matches operators
         if fct:
-            fct(stack, self.table, attribute, reference)
+            if operator in ("sum", "min", "max", "avg", "count"):
+                fct(stack, self.table, attribute, self.columns)
+            else:
+                fct(stack, self.table, attribute, reference)
         else:
             raise LiveStatusQueryError(452, 'invalid filter: %s' % line)
 
