@@ -28,80 +28,37 @@ import time
 import copy
 import pymongo
 import bson
-from pprint import pprint
 
 from shinken.log import logger
-from mongo_mapping import table_class_map, find_filter_converter, list_livestatus_attributes, Problem
-from livestatus_mongo_response import LiveStatusMongoResponse
-from livestatus_stack import LiveStatusStack
-from livestatus_constraints import LiveStatusConstraints
-from livestatus_query_metainfo import LiveStatusQueryMetainfo
+from mongo_mapping import table_class_map
+from livestatus_mongo_response import LiveStatusResponse
 from livestatus_mongo_response import Separators
 from livestatus_query_error import LiveStatusQueryError
-from livestatus_mongo_datamanager import datamgr as mongo_datamgr
 
 #############################################################################
 
-def gen_all(values):
-    for val in values:
-        yield val
 
-def gen_filtered(values, filterfunc):
-    for val in values:
-        if filterfunc(val):
-            yield val
-
-def gen_limit(values, maxelements):
-    ''' This is a generator which returns up to <limit> elements '''
-    loopcnt = 1
-    for val in values:
-        if loopcnt > maxelements:
-            return
-        yield val
-        loopcnt += 1
-
-# This is a generator which returns up to <limit> elements
-# which passed the filter. If the limit has been reached
-# it is no longer necessary to loop through the original list.
-def gen_limit_filtered(values, maxelements, filterfunc):
-    for val in gen_limit(gen_filtered(values, filterfunc), maxelements):
-        yield val
-
-#############################################################################
-
-class LiveStatusMongoQuery(object):
+class LiveStatusQuery(object):
 
     my_type = 'query'
 
-    def __init__(self, datamgr, mongo_datamgr, query_cache, db, pnp_path, return_queue, counters):
+    def __init__(self, datamgr, db, pnp_path, return_queue, counters):
         # Runtime data form the global LiveStatus object
         self.datamgr = datamgr
-        self.mongo_datamgr = mongo_datamgr
-        self.query_cache = query_cache
         self.db = db
         self.pnp_path = pnp_path
         self.return_queue = return_queue
-        self.counters = counters
 
         # Private attributes for this specific request
-        self.response = LiveStatusMongoResponse()
+        self.response = LiveStatusResponse()
         self.authuser = None
         self.table = None
         self.columns = None
-        self.filtercolumns = []
-        self.prefiltercolumns = []
-        self.outputcolumns = []
-        self.stats_group_by = []
-        self.stats_columns = []
-        self.aliases = []
         self.limit = None
         self.extcmd = False
 
         # Initialize the stacks which are needed for the Filter: and Stats:
         # filter- and count-operations
-        self.filter_stack = LiveStatusStack()
-        self.stats_filter_stack = LiveStatusStack()
-        self.stats_postprocess_stack = LiveStatusStack()
         self.stats_query = False
 
         # When was this query launched?
@@ -112,15 +69,50 @@ class LiveStatusMongoQuery(object):
         # This is mostly used in the Response.format... which needs to know
         # the class behind a queries table
         self.table_class_map = table_class_map
-        self.mongo_filters = mongo_datamgr.make_stack()
-        self.mongo_aggregations = mongo_datamgr.make_stack()
-        self.mongo_stats_filters = mongo_datamgr.make_stack()
+        self.filters_stack = self.datamgr.make_stack()
+        self.aggregations_stack = self.datamgr.make_stack()
 
-    def __str__(self):
-        output = "LiveStatusRequest:\n"
-        for attr in ["table", "columns", "filtercolumns", "prefiltercolumns", "aliases", "stats_group_by", "stats_query"]:
-            output += "request %s: %s\n" % (attr, getattr(self, attr))
-        return output
+        self.objects_get_handlers = {
+            'hosts':                self.get_filtered_livedata,
+            'services':             self.get_filtered_livedata,
+            'commands':             self.get_filtered_livedata,
+            'schedulers':           self.get_filtered_livedata,
+            'brokers':              self.get_filtered_livedata,
+            'pollers':              self.get_filtered_livedata,
+            'reactionners':         self.get_filtered_livedata,
+            'contacts':             self.get_filtered_livedata,
+            'contactgroups':        self.get_filtered_livedata,
+            'hostgroups':           self.get_filtered_livedata,
+            'servicegroups':        self.get_filtered_livedata,
+            'timeperiods':          self.get_filtered_livedata,
+            'downtimes':            self.get_list_livedata,
+            'comments':             self.get_list_livedata,
+            'hostsbygroup':         self.get_filtered_livedata,
+            'servicesbygroup':      self.get_filtered_livedata,
+            'problems':             self.get_problem_livedata,
+            'status':               self.get_status_livedata,
+            'columns':              self.get_columns_livedata,
+            'servicesbyhostgroup':  self.get_filtered_livedata
+        }
+        self.operator_mapping = {
+            "=":  self.datamgr.add_filter_eq,
+            "=~":  self.datamgr.add_filter_eq_ci,
+            "~":  self.datamgr.add_filter_reg,
+            "~~":  self.datamgr.add_filter_reg_ci,
+            ">":  self.datamgr.add_filter_gt,
+            ">=":  self.datamgr.add_filter_ge,
+            "<":  self.datamgr.add_filter_lt,
+            "<=":  self.datamgr.add_filter_le,
+            "!=":  self.datamgr.add_filter_not_eq,
+            "!=~":  self.datamgr.add_filter_not_eq_ci,
+            "!~":  self.datamgr.add_filter_not_reg,
+            "!~~":  self.datamgr.add_filter_not_reg_ci,
+            "sum":  self.datamgr.add_aggregation_sum,
+            "min":  self.datamgr.add_aggregation_min,
+            "max":  self.datamgr.add_aggregation_max,
+            "avg":  self.datamgr.add_aggregation_avg,
+            "count":  self.datamgr.add_aggregation_count,
+        }
 
     def split_command(self, line, splits=1):
         """Create a list from the words of a line"""
@@ -137,15 +129,6 @@ class LiveStatusMongoQuery(object):
         mapping = table_class_map[self.table]
         table_columns = mapping.keys()
         return cmd, [c for c in columns.split() if c in table_columns]
-
-    def strip_table_from_column(self, column):
-        """Cut off the table name, because it is possible
-        to say service_state instead of state"""
-        bygroupmatch = re.compile('(\w+)by.*group').search(self.table)
-        if bygroupmatch:
-            return re.sub(re.sub('s$', '', bygroupmatch.group(1)) + '_', '', column, 1)
-        else:
-            return re.sub(re.sub('s$', '', self.table) + '_', '', column, 1)
 
     def parse_filter_line(self, line):
         """
@@ -172,8 +155,6 @@ class LiveStatusMongoQuery(object):
         # Or
         # Stats: scheduled_downtime_depth = 0
         if operator in ['=', '>', '>=', '<', '<=', '=~', '~', '~~', '!=', '!>', '!>=', '!<', '!<=', '!=~', '!~', '!~~']:
-            # Cut off the table name
-            #attribute = self.strip_table_from_column(attribute)
             # Some operators can simply be negated
             if operator in ['!>', '!>=', '!<', '!<=']:
                 operator = {'!>': '<=', '!>=': '<', '!<': '>=', '!<=': '>'}[operator]
@@ -228,14 +209,14 @@ class LiveStatusMongoQuery(object):
             elif keyword == 'AuthUser':
                 _, authuser = self.split_option(line)
                 if self.table in ['hosts', 'services', 'hostgroups', 'servicegroups', 'hostsbygroup', 'servicesbygroup', 'servicesbyhostgroup']:
-                    mongo_datamgr.add_filter_user(
-                        self.mongo_filters,
+                    self.datamgr.add_filter_user(
+                        self.filters_stack,
                         "contacts",
                         authuser
                     )
                 elif self.table in ['contactgroups']:
-                    mongo_datamgr.add_filter_user(
-                        self.mongo_filters,
+                    self.datamgr.add_filter_user(
+                        self.filters_stack,
                         "members",
                         authuser
                     )
@@ -247,7 +228,7 @@ class LiveStatusMongoQuery(object):
                         self.db.add_filter(operator, attribute, reference)
                     else:
                         self.add_filter(
-                            self.mongo_filters,
+                            self.filters_stack,
                             operator,
                             attribute,
                             reference
@@ -264,8 +245,8 @@ class LiveStatusMongoQuery(object):
                 if self.table == 'log':
                     self.db.add_filter_and(andnum)
                 else:
-                    mongo_datamgr.stack_filter_and(
-                        self.mongo_filters,
+                    self.datamgr.stack_filter_and(
+                        self.filters_stack,
                         self.table,
                         andnum
                     )
@@ -277,8 +258,8 @@ class LiveStatusMongoQuery(object):
                 if self.table == 'log':
                     self.db.add_filter_or(ornum)
                 else:
-                    mongo_datamgr.stack_filter_or(
-                        self.mongo_filters,
+                    self.datamgr.stack_filter_or(
+                        self.filters_stack,
                         self.table,
                         ornum
                     )
@@ -287,8 +268,8 @@ class LiveStatusMongoQuery(object):
                 if self.table == 'log':
                     self.db.add_filter_not()
                 else:
-                    mongo_datamgr.stack_filter_negate(
-                        self.mongo_filters,
+                    self.datamgr.stack_filter_negate(
+                        self.filters_stack,
                         notnum
                     )
             elif keyword == 'Stats':
@@ -296,7 +277,7 @@ class LiveStatusMongoQuery(object):
                 try:
                     attribute, operator, reference = self.parse_filter_line(line)
                     self.add_filter(
-                        self.mongo_stats_filters,
+                        self.aggregations_stack,
                         operator,
                         attribute,
                         reference
@@ -307,22 +288,22 @@ class LiveStatusMongoQuery(object):
                     continue
             elif keyword == 'StatsAnd':
                 _, andnum = self.split_option(line)
-                mongo_datamgr.stack_filter_and(
-                    self.mongo_stats_filters,
+                self.datamgr.stack_filter_and(
+                    self.aggregations_stack,
                     self.table,
                     andnum
                 )
             elif keyword == 'StatsOr':
                 _, ornum = self.split_option(line)
-                mongo_datamgr.stack_filter_or(
-                    self.mongo_stats_filters,
+                self.datamgr.stack_filter_or(
+                    self.aggregations_stack,
                     self.table,
                     ornum
                 )
             elif keyword == 'StatsNegate':
                 _, notnum = self.split_option(line)
-                mongo_datamgr.stack_filter_negate(
-                    self.mongo_stats_filters,
+                self.datamgr.stack_filter_negate(
+                    self.aggregations_stack,
                     notnum
                 )
             elif keyword == 'Separators':
@@ -336,11 +317,10 @@ class LiveStatusMongoQuery(object):
                 # This line is not valid or not implemented
                 logger.error("[Livestatus Query] Received a line of input which i can't handle: '%s'" % line)
                 pass
-        self.metainfo = LiveStatusQueryMetainfo(data)
 
     def process_query(self):
         result = self.launch_query()
-        self.response.format_live_data(result, self.columns, self.aliases)
+        self.response.format_live_data(result, self.columns)
         return self.response.respond()
 
     def launch_query(self):
@@ -373,29 +353,21 @@ class LiveStatusMongoQuery(object):
             traceback.print_exc(32)
             return []
 
-    def get_table(self, table_name):
-        """
-        Returns a given table from the regenerator.
-
-        :param str table_name: The table name to retrieve
-        """
-        return self.datamgr.rg.get_table(table_name)
-
     def execute_filter_query(self, table=None):
         """
         Execute a filter query
         """
         if table is None:
             table = self.table
-        print("Mongo filter query: table: %s" % table)
-        query = mongo_datamgr.get_filter_query(
+        query = self.datamgr.get_filter_query(
             table,
-            self.mongo_filters,
+            self.filters_stack,
             self.columns,
             self.limit,
         )
-        pprint(query)
-        return mongo_datamgr.find(table, query)
+        logger.debug("executing mongo filter query against table: %s" % table)
+        logger.debug(query)
+        return self.datamgr.find(table, query)
 
     def execute_aggregation_query(self, table=None):
         """
@@ -405,13 +377,15 @@ class LiveStatusMongoQuery(object):
             table = self.table
         results = {}
         # If no aggregation has been
-        for i, query in enumerate(self.mongo_stats_filters):
-            query = mongo_datamgr.get_aggregation_query(table, self.mongo_filters, query, self.columns)
-            print("Mongo aggregation query: table: %s" % table)
-            pprint(query)
-            for result in mongo_datamgr.aggregate(table, query):
-                print("Aggregation result")
-                pprint(result)
+        for i, query in enumerate(self.aggregations_stack):
+            query = self.datamgr.get_aggregation_query(table, self.filters_stack, query, self.columns)
+            logger.debug(
+                "executing mongo aggregation query agains table: %s" % table
+            )
+            logger.debug(query)
+            logger.debug("aggregation result")
+            for result in self.datamgr.aggregate(table, query):
+                logger.debug(result)
                 if result["group"] is None:
                     group = results.setdefault(
                         None,
@@ -432,7 +406,7 @@ class LiveStatusMongoQuery(object):
             row = [stats["group"]]
             row.extend([
                 stats["stats"].get(i, 0)
-                for i in range(len(self.mongo_stats_filters))
+                for i in range(len(self.aggregations_stack))
             ])
             rows.append(row)
         return rows
@@ -445,7 +419,7 @@ class LiveStatusMongoQuery(object):
         Check input parameters, and get queries depending on the query
         requested
         """
-        if self.mongo_stats_filters:
+        if self.aggregations_stack:
             return self.execute_aggregation_query(table)
         else:
             return self.execute_filter_query(table)
@@ -455,7 +429,7 @@ class LiveStatusMongoQuery(object):
         For each hostgroup, get the member hosts (filterred) and merge the
         hostgroup attributes.
         """
-        if self.mongo_stats_filters:
+        if self.aggregations_stack:
             return self.execute_aggregation_query("hostsbygroup")
         else:
             return self.execute_filter_query("hostsbygroup")
@@ -465,7 +439,7 @@ class LiveStatusMongoQuery(object):
         For each hostgroup, get the member hosts (filterred) and merge the
         hostgroup attributes.
         """
-        if self.mongo_stats_filters:
+        if self.aggregations_stack:
             return self.execute_aggregation_query("servicesbygroup", "servicegroups")
         else:
             return self.execute_filter_query("servicesbygroup", "servicegroups")
@@ -475,7 +449,7 @@ class LiveStatusMongoQuery(object):
         For each hostgroup, get the member hosts (filterred) and merge the
         hostgroup attributes.
         """
-        if self.mongo_stats_filters:
+        if self.aggregations_stack:
             return self.execute_aggregation_query("servicesbyhostgroup", "hostgroups")
         else:
             return self.execute_filter_query("servicesbyhostgroup", "hostgroups")
@@ -592,29 +566,6 @@ class LiveStatusMongoQuery(object):
             )
         )], key=lambda svc: svc.hostgroup.hostgroup_name)
 
-    objects_get_handlers = {
-        'hosts':                get_filtered_livedata,
-        'services':             get_filtered_livedata,
-        'commands':             get_filtered_livedata,
-        'schedulers':           get_filtered_livedata,
-        'brokers':              get_filtered_livedata,
-        'pollers':              get_filtered_livedata,
-        'reactionners':         get_filtered_livedata,
-        'contacts':             get_filtered_livedata,
-        'contactgroups':        get_filtered_livedata,
-        'hostgroups':           get_filtered_livedata,
-        'servicegroups':        get_filtered_livedata,
-        'timeperiods':          get_filtered_livedata,
-        'downtimes':            get_list_livedata,
-        'comments':             get_list_livedata,
-        'hostsbygroup':         get_filtered_livedata,
-        'servicesbygroup':      get_filtered_livedata,
-        'problems':             get_problem_livedata,
-        'status':               get_status_livedata,
-        'columns':              get_columns_livedata,
-        'servicesbyhostgroup':  get_filtered_livedata
-    }
-
     def get_live_data(self):
         """
         Find the objects which match the request.
@@ -624,7 +575,7 @@ class LiveStatusMongoQuery(object):
             logger.warning("[Livestatus Query] Got unhandled table: %s" % (self.table))
             return []
 
-        return handler(self)
+        return handler()
 
     def _get_live_data_log(self, cs):
         for x in self.db.get_live_data_log():
@@ -641,499 +592,6 @@ class LiveStatusMongoQuery(object):
         if self.limit:
             items = gen_limit(items, self.limit)
         return items
-
-#    def get_mongo_attribute_name(self, attribute):
-#        """
-#        Return the attribute name to use to query the mongo database.
-#
-#        Some attribute hold different names when requested through LQL, and
-#        queried in mongo. Return the suitable attribute for Mongo query
-#        from LQL.
-#
-#        :param str attribute: The LQL requested attribute
-#        :rtype: str
-#        :return: The attribute name to use in mongo query
-#        """
-#        mapping = self.table_class_map[self.table][attribute]
-#        return mapping.get("filters", {}).get("attr", attribute)
-#
-#    def get_mongo_attribute_type(self, attribute):
-#        """
-#        Returns the attribute type, as shown in object mapping
-#
-#        :param str attribute: The LQL requested attribute
-#        :rtype: type
-#        :return: The attribute type
-#        """
-#        return self.table_class_map[self.table][attribute].get("datatype")
-#
-#    def add_mongo_filter_eq(self, stack, attribute, reference):
-#        """
-#        Transposes an equalitiy operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: []
-#            })
-#        elif attrtype is not None:
-#            stack.append({
-#                attrname: {
-#                    "$eq": attrtype(reference)
-#                }
-#            })
-#        else:
-#            stack.append({
-#                attrname: {
-#                    "$eq": reference
-#                }
-#            })
-#
-#    def add_mongo_filter_eq_ci(self, stack, attribute, reference):
-#        """
-#        Transposes a case insensitive equalitiy operator filter into a mongo
-#        query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            raise LiveStatusQueryError(452, 'operator not available for lists')
-#        # Builds regular expression
-#        reg = "^%s$" % reference
-#        stack.append({
-#            attrname: re.compile(reg, re.IGNORECASE)
-#        })
-#
-#    def add_mongo_filter_reg(self, stack, attribute, reference):
-#        """
-#        Transposes a regex match operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        # Builds regular expression
-#        reg = str(reference)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {
-#                    "$in": [re.compile(reg)]
-#                }
-#            })
-#        else:
-#            stack.append({
-#                attrname: re.compile(reg)
-#            })
-#
-#    def add_mongo_filter_reg_ci(self, stack, attribute, reference):
-#        """
-#        Transposes a case insensitive regex match operator filter into a mongo
-#        query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        # Builds regular expression
-#        reg = str(reference)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {
-#                    "$in": [
-#                        re.compile(reg, re.IGNORECASE)
-#                    ]
-#                }
-#            })
-#        else:
-#            stack.append({
-#                attrname: re.compile(reg, re.IGNORECASE)
-#            })
-#
-#    def add_mongo_filter_lt(self, stack, attribute, reference):
-#        """
-#        Transposes a lower than operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {
-#                    "$nin": [reference]
-#                }
-#            })
-#        else:
-#            stack.append({
-#                attrname: {"$lt": reference}
-#            })
-#
-#    def add_mongo_filter_le(self, stack, attribute, reference):
-#        """
-#        Transposes a lower than or equal operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            # Builds regular expression
-#            reg = "^%s$" % reference
-#            stack.append({
-#                attrname: {
-#                    "$in": [re.compile(reg, re.IGNORECASE)]
-#                }
-#            })
-#        elif attrtype is not None:
-#            stack.append({
-#                attrname: {"$lte": attrtype(reference)}
-#            })
-#        else:
-#            stack.append({
-#                attrname: {"$lte": reference}
-#            })
-#
-#    def add_mongo_filter_gt(self, stack, attribute, reference):
-#        """
-#        Transposes a lower than operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            # Builds regular expression
-#            reg = "^%s$" % reference
-#            stack.append({
-#                attrname: {
-#                    "$nin": [re.compile(reg, re.IGNORECASE)]
-#                }
-#            })
-#        elif attrtype is not None:
-#            stack.append({
-#                attrname: {"$gt": attrtype(reference)}
-#            })
-#        else:
-#            stack.append({
-#                attrname: {"$gt": reference}
-#            })
-#
-#    def add_mongo_filter_ge(self, stack, attribute, reference):
-#        """
-#        Transposes a greater than or equal operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {"$in": [reference]}
-#            })
-#        elif attrtype is not None:
-#            stack.append({
-#                attrname: {"$gte": attrtype(reference)}
-#            })
-#        else:
-#            stack.append({
-#                attrname: {"$gte": reference}
-#            })
-#
-#    def add_mongo_filter_not_eq(self, stack, attribute, reference):
-#        """
-#        Transposes a not equal  operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {"$ne": []}
-#            })
-#        elif attrtype is not None:
-#            stack.append({
-#                attrname: {"$ne": attrtype(reference)}
-#            })
-#        else:
-#            stack.append({
-#                attrname: {"$ne": reference}
-#            })
-#
-#    def add_mongo_filter_not_eq_ci(self, stack, attribute, reference):
-#        """
-#        Transposes a case insensitive not equal operator filter into a mongo
-#        query
-#
-#        Before MongoDB version 4.0.7, $not does not support $regex
-#        This, using bson.regex.Regex regular expressions is required
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        if attrtype is list:
-#            raise LiveStatusQueryError(452, 'operator not available for lists')
-#        # Builds regular expression
-#        reg = "^%s$" % reference
-#        stack.append({
-#            attrname: {
-#                "$not": re.compile(reg, re.IGNORECASE)
-#            }
-#        })
-#
-#    def add_mongo_filter_not_reg(self, stack, attribute, reference):
-#        """
-#        Transposes a regex not match operator filter into a mongo query
-#
-#        Before MongoDB version 4.0.7, $not does not support $regex
-#        This, using bson.regex.Regex regular expressions is required
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        # Builds regular expression
-#        reg = str(reference)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {
-#                    "$nin": [re.compile(reg)]
-#                }
-#            })
-#        else:
-#            stack.append({
-#                attrname: {"$not": re.compile(reg)}
-#            })
-#
-#    def add_mongo_filter_not_reg_ci(self, stack, attribute, reference):
-#        """
-#        Transposes a case insensitive regex not match operator filter into a
-#        mongo query
-#
-#        Before MongoDB version 4.0.7, $not does not support $regex
-#        This, using bson.regex.Regex regular expressions is required
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        attrtype = self.get_mongo_attribute_type(attribute)
-#        # Builds regular expression
-#        reg = str(reference)
-#        if attrtype is list:
-#            stack.append({
-#                attrname: {
-#                    "$nin": [re.compile(reg, re.IGNORECASE)]
-#                }
-#            })
-#        else:
-#            stack.append({
-#                attrname: {
-#                    "$not": re.compile(reg, re.IGNORECASE)
-#                }
-#            })
-#
-#    def add_mongo_filter_dummy(self, stack, attribute, reference):
-#        """
-#        Transposes a dummy (always true) operator filter into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        stack.append({})
-#
-#    def add_mongo_filter_user(self, stack, attribute, username):
-#        """
-#        Add a filter limitting the output to hosts/services having the
-#        username as contact.
-#
-#        :param list stack: The stack to append filter to
-#        :param str username: The username to limit output to
-#        """
-#        stack.append({
-#            attribute: {
-#                "$in": [str(username)]
-#            }
-#        })
-#
-#    def add_mongo_aggregation_sum(self, stack, attribute, reference=None):
-#        """
-#        Transposes a stats sum aggregation into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        stack.append([
-#            {
-#                "$group": {
-#                    "_id": None,
-#                    "result": {
-#                        "$sum": "$%s" % attrname
-#                    }
-#                },
-#            },
-#            {
-#                "$project": {
-#                    "_id": 0,
-#                    "result": 1
-#                }
-#            }
-#        ])
-#
-#    def add_mongo_aggregation_max(self, stack, attribute, reference=None):
-#        """
-#        Transposes a stats max aggregation into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        stack.append([
-#            {
-#                "$group": {
-#                    "_id": None,
-#                    "result": {
-#                        "$max": "$%s" % attrname
-#                    }
-#                },
-#            },
-#            {
-#                "$project": {
-#                    "_id": 0,
-#                    "result": 1
-#                }
-#            }
-#        ])
-#
-#    def add_mongo_aggregation_min(self, stack, attribute, reference=None):
-#        """
-#        Transposes a stats min aggregation into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        stack.append([
-#            {
-#                "$group": {
-#                    "_id": "$item",
-#                    "result": {
-#                        "$min": "$%s" % attrname
-#                    }
-#                },
-#            },
-#            {
-#                "$project": {
-#                    "_id": 0,
-#                    "result": 1
-#                }
-#            }
-#        ])
-#
-#    def add_mongo_aggregation_avg(self, stack, attribute, reference=None):
-#        """
-#        Transposes a stats average aggregation into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        attrname = self.get_mongo_attribute_name(attribute)
-#        stack.append([
-#            {
-#                "$group": {
-#                    "_id": None,
-#                    "result": {
-#                        "$avg": "$%s" % attrname
-#                    }
-#                },
-#            },
-#            {
-#                "$project": {
-#                    "_id": 0,
-#                    "result": 1
-#                }
-#            }
-#        ])
-#
-#    def add_mongo_aggregation_count(self, stack, attribute=None, reference=None):
-#        """
-#        Transposes a stats count aggregation into a mongo query
-#
-#        :param list stack: The stack to append filter to
-#        :param str attribute: The attribute name to compare
-#        :param str reference: The reference value to compare to
-#        """
-#        stack.append([
-#            {
-#                "$group": {
-#                    "_id": None,
-#                    "result": {
-#                        "$sum": 1
-#                    }
-#                },
-#            },
-#            {
-#                "$project": {
-#                    "_id": 0,
-#                    "result": 1
-#                }
-#            }
-#        ])
-
-    operator_mapping = {
-        "=":  mongo_datamgr.add_filter_eq,
-        "=~":  mongo_datamgr.add_filter_eq_ci,
-        "~":  mongo_datamgr.add_filter_reg,
-        "~~":  mongo_datamgr.add_filter_reg_ci,
-        ">":  mongo_datamgr.add_filter_gt,
-        ">=":  mongo_datamgr.add_filter_ge,
-        "<":  mongo_datamgr.add_filter_lt,
-        "<=":  mongo_datamgr.add_filter_le,
-        "!=":  mongo_datamgr.add_filter_not_eq,
-        "!=~":  mongo_datamgr.add_filter_not_eq_ci,
-        "!~":  mongo_datamgr.add_filter_not_reg,
-        "!~~":  mongo_datamgr.add_filter_not_reg_ci,
-        "sum":  mongo_datamgr.add_aggregation_sum,
-        "min":  mongo_datamgr.add_aggregation_min,
-        "max":  mongo_datamgr.add_aggregation_max,
-        "avg":  mongo_datamgr.add_aggregation_avg,
-        "count":  mongo_datamgr.add_aggregation_count,
-    }
 
     def add_filter(self, stack, operator, attribute, reference):
         """
@@ -1154,131 +612,4 @@ class LiveStatusMongoQuery(object):
             else:
                 fct(stack, self.table, attribute, reference)
         else:
-            raise LiveStatusQueryError(452, 'invalid filter: %s' % line)
-
-#    def stack_mongo_filter_and(self, stack, count):
-#        """
-#        Stacks the last `count` operations into an `and` group
-#
-#        :param list stack: The stack to append filter to
-#        :param str table: The table the attribute is in
-#        :param int count: The number of statements to stack
-#        """
-#        if len(stack) < count:
-#            raise LiveStatusQueryError(452, 'No enough filters to stack into `and`')
-#        and_filter = {
-#            "$and": stack[-count:]
-#        }
-#        del stack[-count:]
-#        stack.append(and_filter)
-#
-#    def stack_mongo_filter_or(self, stack, count):
-#        """
-#        Stacks the last `count` operations into an `or` group
-#
-#        :param list stack: The stack to append filter to
-#        :param str table: The table the attribute is in
-#        :param int count: The number of statements to stack
-#        """
-#        if len(stack) < count:
-#            raise LiveStatusQueryError(452, 'No enough filters to stack into `or`')
-#        or_filter = {
-#            "$or": stack[-count:]
-#        }
-#        del stack[-count:]
-#        stack.append(or_filter)
-#
-#    def stack_mongo_filter_negate(self, stack, count, wrap=True):
-#        """
-#        Inverts the logic of the previous filters stack
-#
-#        As there's no global $not operator in MongoDB query ($not can only
-#        be applied to an attribute), we're forced to negate by inverting
-#        the query logic itself.
-#
-#        :param list stack: The stack to append filter to
-#        :param str table: The table the attribute is in
-#        :param int count: The number of statements to negate
-#        :param bool wrap: Should the result be wrapped in an "$or"
-#        """
-#        if not count:
-#            count = len(stack)
-#        if len(stack) < count:
-#            raise LiveStatusQueryError(452, 'No enough filters to stack into `negate`')
-#        # Negates each element in the stack
-#        for i in range(len(stack)-count, len(stack)):
-#            statement = stack[i]
-#            if isinstance(statement, list):
-#                raise LiveStatusQueryError(452, 'Cannot negate aggregation stats')
-#            stack[i] = self.stack_mongo_filter_negate_statement(statement)
-#        if wrap is True:
-#            reversed_stack = list(stack[-count:])
-#            del stack[-count:]
-#            stack.append({
-#                "$or": reversed_stack
-#            })
-#        return stack
-#
-#    def stack_mongo_filter_negate_statement(self, statement):
-#        """
-#        Inverts the logic of a single statement
-#
-#        As there's no global $not operator in MongoDB query ($not can only
-#        be applied to an attribute), we're forced to negate by inverting
-#        the query logic itself.
-#
-#        :param str table: The table the attribute is in
-#        :param dict statement: The statement to negate
-#        :rtype: dict
-#        :return: The negated statement
-#        """
-#        reversed_operators = {
-#            "$eq": "$ne",
-#            "$ne": "$eq",
-#            "$gt": "$le",
-#            "$le": "$gt",
-#            "$ge": "$lt",
-#            "$lt": "$ge",
-#            "$in": "$nin",
-#            "$nin": "$in",
-#            "$or": "$and",
-#            "$and": "$or",
-#        }
-#        for attribute, comparator in list(statement.items()):
-#            if attribute in ("$and", "$or"):
-#                # Manages $and, $or, and other grouping statements
-#                # Statement has pattern: {"$or": [...]} or {"$and": [...]}
-#                # $or becomes $and and conversely
-#                reversed_operator = reversed_operators[attribute]
-#                stack = list(statement[attribute])
-#                # There can't both $and or $or with another operartor
-#                # Returning the value directly
-#                return {
-#                    reversed_operator: self.stack_mongo_filter_negate(
-#                        stack=stack,
-#                        count=len(stack),
-#                        wrap=False
-#                    )
-#                }
-#            # Statement has pattern: {field: comparator}
-#            if isinstance(comparator, dict):
-#                # Statement has pattern: {field: {"$eq": value}}
-#                # {"$eq": value} becomes {"$ne": value} and so on...
-#                for operator, value in list(comparator.items()):
-#                    if operator == "$not":
-#                        # Statement has pattern: {field: {"$not": value}}
-#                        # {field: {"$not": value}} becomes {field: value}
-#                        statement[attribute] = value
-#                        break
-#                    if operator not in reversed_operators:
-#                        raise LiveStatusQueryError(452, 'Cannot negate statement %s' % statement)
-#                    reversed_operator = reversed_operators[operator]
-#                    del comparator[operator]
-#                    comparator[reversed_operator] = value
-#            else:
-#                # Statement has pattern: {field: value}
-#                # {field: value} becomes {field: {"$not": value}}
-#                statement[attribute] = {
-#                    "$not": statement[attribute]
-#                }
-#        return statement
+            raise LiveStatusQueryError(450, 'invalid filter: %s' % line)

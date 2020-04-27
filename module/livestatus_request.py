@@ -24,8 +24,7 @@
 
 import time
 
-from livestatus_query import LiveStatusQuery
-from livestatus_mongo_query import LiveStatusMongoQuery
+from livestatus_mongo_query import LiveStatusQuery
 from livestatus_wait_query import LiveStatusWaitQuery
 from livestatus_command_query import LiveStatusCommandQuery
 
@@ -33,17 +32,15 @@ class LiveStatusRequest:
 
     """A class describing a livestatus request."""
 
-    def __init__(self, data, datamgr, mongo_datamgr, query_cache, db, pnp_path, return_queue, counters, backend="memory"):
+    def __init__(self, data, datamgr, mongo_datamgr, db, pnp_path, return_queue, counters):
         self.data = data
         # Runtime data form the global LiveStatus object
         self.datamgr = datamgr
         self.mongo_datamgr = mongo_datamgr
-        self.query_cache = query_cache
         self.db = db
         self.pnp_path = pnp_path
         self.return_queue = return_queue
         self.counters = counters
-        self.backend = backend
 
         self.queries = []
         # Set a timestamp for this specific request
@@ -80,23 +77,30 @@ class LiveStatusRequest:
                 query_cmds.append(line)
         if len(external_cmds) > 0:
             for external_cmd in external_cmds:
-                query = LiveStatusCommandQuery(self.datamgr, self.query_cache, self.db,
-                                               self.pnp_path, self.return_queue, self.counters)
+                query = LiveStatusCommandQuery(
+                    self.datamgr,
+                    self.db,
+                    self.pnp_path,
+                    self.return_queue,
+                    self.counters)
                 query.parse_input(external_cmd)
                 self.queries.append(query)
         if len(wait_cmds) > 1:
-            query = LiveStatusWaitQuery(self.datamgr, self.query_cache, self.db,
-                                        self.pnp_path, self.return_queue, self.counters)
+            query = LiveStatusWaitQuery(
+                self.datamgr,
+                self.db,
+                self.pnp_path,
+                self.return_queue,
+                self.counters)
             query.parse_input('\n'.join(wait_cmds))
             self.queries.append(query)
         if len(query_cmds) > 0:
-            if self.backend == "mongo":
-                query = LiveStatusMongoQuery(self.datamgr , self.mongo_datamgr,
-                                        self.query_cache, self.db,
-                                        self.pnp_path, self.return_queue,
-                                        self.counters)
-            else:
-                query = LiveStatusQuery(self.datamgr, self.query_cache, self.db,
-                                        self.pnp_path, self.return_queue, self.counters)
+            query = LiveStatusQuery(
+                self.mongo_datamgr,
+                self.db,
+                self.pnp_path,
+                self.return_queue,
+                self.counters
+            )
             query.parse_input('\n'.join(query_cmds))
             self.queries.append(query)

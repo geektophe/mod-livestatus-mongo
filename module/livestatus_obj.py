@@ -63,7 +63,6 @@ class LiveStatus(object):
 
     def __init__(self, datamgr, query_cache, db, pnp_path, return_queue, counters=None):
         self.datamgr = datamgr
-        self.mongo_datamgr = datamgr
         self.query_cache = query_cache
         self.db = db
         self.pnp_path = pnp_path
@@ -75,16 +74,19 @@ class LiveStatus(object):
         self.mongo_datamgr = mongo_datamgr
         self.mongo_datamgr.load(self.mongo_client.livestatus)
 
-    def handle_request(self, data, backend=None):
+    def handle_request(self, data):
         try:
-            return self.handle_request_and_fail(data, backend)
+            return self.handle_request_and_fail(data)
         except LiveStatusQueryError as err:
             # LiveStatusQueryError(404, table)
             # LiveStatusQueryError(450, column)
             code, output = err.args
         except Exception as err:
-            logger.error("[Livestatus] Unexpected error during process of request %r : %s",
-                         data, err)
+            logger.error(
+                "[Livestatus] Unexpected error during process of request %r : %s",
+                 data,
+                 err
+            )
             # Also show the exception
             trb = traceback.format_exc()
             logger.error("[Livestatus] Back trace of this exception: %s", trb)
@@ -97,15 +99,20 @@ class LiveStatus(object):
             response.responseheader = 'fixed16'
         return response.respond()
 
-    def handle_request_and_fail(self, data, backend):
+    def handle_request_and_fail(self, data):
         """Execute the livestatus request.
 
         This function creates a LiveStatusRequest instance, calls the parser,
         handles the execution of the request and formatting of the result.
         """
-        request = LiveStatusRequest(data, self.datamgr, self.mongo_datamgr,
-                                    self.query_cache, self.db, self.pnp_path,
-                                    self.return_queue, self.counters, backend)
+        request = LiveStatusRequest(
+                data,
+                self.datamgr,
+                self.mongo_datamgr,
+                self.db,
+                self.pnp_path,
+                self.return_queue,
+                self.counters)
         request.parse_input(data)
         # sort alphabetically on the query type :
         queries = sorted(request.queries, key=lambda q: q.my_type)

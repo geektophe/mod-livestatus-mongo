@@ -26,13 +26,14 @@
 from shinken.util import safe_print
 from shinken.misc.sorter import hst_srv_sort, last_state_change_earlier
 from shinken.misc.filter import only_related_to
-from mongo_mapping import table_class_map, find_filter_converter, list_livestatus_attributes, Problem
+from mongo_mapping import table_class_map
 from livestatus_query_error import LiveStatusQueryError
 from pprint import pprint
 import pymongo
 import re
 
 class DataManager(object):
+
     def __init__(self):
         self.db = None
 
@@ -488,7 +489,6 @@ class DataManager(object):
         :rtype: str
         :return: The attribute name to use in mongo query
         """
-        print("get_column_attribute(): table: %s" % table)
         mapping = table_class_map[table][attribute]
         # Special case, if mapping is {}, no filtering is supported on this
         # attribute
@@ -885,7 +885,6 @@ class DataManager(object):
         :param str attribute: The attribute name to compare
         :param list columns: The columns to group by stats
         """
-        print("add_aggregation_sum(): columns: %s" % columns)
         attrname = self.get_column_attribute(table, attribute)
         if table in self.grouping_tables and columns is None:
             columns = [self.grouping_tables[table]]
@@ -929,7 +928,6 @@ class DataManager(object):
         :param str attribute: The attribute name to compare
         :param list columns: The columns to group by stats
         """
-        print("add_aggregation_max(): columns: %s" % columns)
         attrname = self.get_column_attribute(table, attribute)
         if table in self.grouping_tables and columns is None:
             columns = [self.grouping_tables[table]]
@@ -973,7 +971,6 @@ class DataManager(object):
         :param str attribute: The attribute name to compare
         :param list columns: The columns to group by stats
         """
-        print("add_aggregation_min(): columns: %s" % columns)
         attrname = self.get_column_attribute(table, attribute)
         if table in self.grouping_tables and columns is None:
             columns = [self.grouping_tables[table]]
@@ -1017,7 +1014,6 @@ class DataManager(object):
         :param str attribute: The attribute name to compare
         :param list columns: The columns to group by stats
         """
-        print("add_aggregation_avg(): columns: %s" % columns)
         attrname = self.get_column_attribute(table, attribute)
         if table in self.grouping_tables and columns is None:
             columns = [self.grouping_tables[table]]
@@ -1061,7 +1057,6 @@ class DataManager(object):
         :param str attribute: The attribute name to compare
         :param list columns: The columns to group by stats
         """
-        print("add_aggregation_count(): columns: %s" % columns)
         if table in self.grouping_tables and columns is None:
             columns = [self.grouping_tables[table]]
         if columns:
@@ -1567,14 +1562,8 @@ class DataManager(object):
         if groupby is not None and groupby not in projection:
             projection[groupby] = 1
 
-        print("get_filter_query(): columns")
-        pprint(columns)
-        print("get_filter_query(): projetions")
-        pprint(projection)
-
         # Check if another collection lookup is necessary
         get_lookup_fct_name = "get_mongo_lookup_%s" % table
-        print("find(): get_lookup_fct_name: %s" % get_lookup_fct_name)
         get_lookup_fct = getattr(self, get_lookup_fct_name, None)
 
         if get_lookup_fct:
@@ -1614,8 +1603,6 @@ class DataManager(object):
                 pipeline.append(
                     {"$sort": {groupby: 1}}
                 )
-            print("get_filter_query(): aggregation pipeline")
-            pprint(pipeline)
             return pipeline
         else:
             parms = {
@@ -1691,7 +1678,6 @@ class DataManager(object):
             collection = match.group(1)
         else:
             collection = table
-        print("get_collection(): collection: %s" % collection)
         return getattr(self.db, collection)
 
     def find(self, table, query):
@@ -1705,15 +1691,6 @@ class DataManager(object):
         if isinstance(query, list):
             return collection.aggregate(query)
         else:
-#            parms = [query["filter"]]
-#            if "projection" in query:
-#                parms.append(query["projection"])
-#            cursor = collection.find(*parms)
-#            if "sort" in query:
-#                cursor = cursor.sort(query["sort"])
-#            if "limit" in query:
-#                cursor = cursor.limit(query["limit"])
-#            return cursor
             return collection.find(**query)
 
     def count(self, table, query):

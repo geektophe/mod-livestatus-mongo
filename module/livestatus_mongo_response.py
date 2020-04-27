@@ -103,7 +103,7 @@ generator value at its index in this list.
         del self[:]
 
 
-class LiveStatusMongoResponse:
+class LiveStatusResponse(object):
     """A class which represents the response to a LiveStatusRequest.
 
     Public functions:
@@ -123,12 +123,6 @@ class LiveStatusMongoResponse:
         self.separators = separators
         self.statuscode = 200
         self.output = LiveStatusListResponse()
-
-    def __str__(self):
-        output = "LiveStatusResponse:\n"
-        for attr in ["responseheader", "outputformat", "keepalive", "columnheaders", "separators"]:
-            output += "response %s: %s\n" % (attr, getattr(self, attr))
-        return output
 
     def set_error(self, statuscode, data):
         del self.output[:]
@@ -225,21 +219,20 @@ class LiveStatusMongoResponse:
                     value = item.get(attr, "")
                 row.append(value)
             except Exception as e:
-                print("failed to map value %s/%s to: %s" % (
-                    self.query.table, column, e)
+                raise LiveStatusQueryError(
+                    450,
+                    "failed to map value %s/%s: %s" %
+                    (self.query.table, column, e)
                 )
-                raise
         return row
 
-    def format_live_data_items(self, results, columns, aliases):
+    def format_live_data_items(self, results, columns):
         if columns is None:
             columns = table_class_map[self.query.table].keys()
             # There is no pre-selected list of columns. In this case
             # we output all columns.
 
-        headers = list((aliases[col] for col in columns)
-                        if len(aliases)
-                        else columns)
+        headers = columns
 
         if self.outputformat != 'csv':
             showheader = self.columnheaders == 'on'
@@ -266,7 +259,7 @@ class LiveStatusMongoResponse:
             writer.writerow(rows)
             return f.getvalue()
 
-    def format_live_data_stats(self, results, columns, aliases):
+    def format_live_data_stats(self, results, columns):
         rows = []
         for result in results:
             item = result.pop(0)
@@ -294,15 +287,14 @@ class LiveStatusMongoResponse:
             writer.writerow(rows)
             return f.getvalue()
 
-    def format_live_data(self, results, columns, aliases):
+    def format_live_data(self, results, columns):
         '''
 
         :param results:
         :param columns:
-        :param aliases:
         :return:
         '''
         if self.query.stats_query:
-            self.output = self.format_live_data_stats(results, columns, aliases)
+            self.output = self.format_live_data_stats(results, columns)
         else:
-            self.output = self.format_live_data_items(results, columns, aliases)
+            self.output = self.format_live_data_items(results, columns)

@@ -77,7 +77,7 @@ class TestConfigBig(TestConfig):
         print("\n***")
         print("Query:")
         print(query)
-        response, _ = self.livestatus_broker.livestatus.handle_request(query, "mongo")
+        response, _ = self.livestatus_broker.livestatus.handle_request(query)
         print("Response")
         print(response)
         pyresponse = eval(response)

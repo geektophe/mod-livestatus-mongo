@@ -14,11 +14,11 @@ from pprint import pprint
 #
 
 old_livestatus_handle_request = livestatus.livestatus_obj.LiveStatus.handle_request
-def mocked_livestatus_handle_request(self, request_data, backend=None):
+def mocked_livestatus_handle_request(self, request_data):
     '''Implement an extended version of LiveStatus.handle_request where we return
       the response flattened in case it was a LiveStatusListResponse'''
     try:
-        response, keepalive = old_livestatus_handle_request(self, request_data, backend)
+        response, keepalive = old_livestatus_handle_request(self, request_data)
         if isinstance(response, livestatus.livestatus_response.LiveStatusListResponse):
             response = ''.join(response)
     except livestatus.livestatus_query_error.LiveStatusQueryError as err:
