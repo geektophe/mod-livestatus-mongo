@@ -25,8 +25,6 @@
 
 from types import GeneratorType
 from collections import namedtuple
-from mongo_mapping import table_class_map
-from livestatus_mongo_datamanager import datamgr
 
 import csv
 import json
@@ -115,7 +113,7 @@ class LiveStatusResponse(object):
 
     separators = Separators('\n', ';', ',', '|')
 
-    def __init__(self, responseheader='off', outputformat='csv', keepalive='off', columnheaders='off', separators=separators):
+    def __init__(self,responseheader='off', outputformat='csv', keepalive='off', columnheaders='off', separators=separators):
         self.responseheader = responseheader
         self.outputformat = outputformat
         self.keepalive = keepalive
@@ -206,7 +204,7 @@ class LiveStatusResponse(object):
         row = []
         for column in columns:
             try:
-                mapping = table_class_map[self.query.table][column]
+                mapping = self.query.mapping[self.query.table][column]
                 attr = mapping.get('filters', {}).get('attr', column)
                 if "function" in mapping:
                     value = mapping["function"](item)
@@ -228,7 +226,7 @@ class LiveStatusResponse(object):
 
     def format_live_data_items(self, results, columns):
         if columns is None:
-            columns = table_class_map[self.query.table].keys()
+            columns = self.query.mapping[self.query.table].keys()
             # There is no pre-selected list of columns. In this case
             # we output all columns.
 
@@ -259,32 +257,18 @@ class LiveStatusResponse(object):
             writer.writerow(rows)
             return f.getvalue()
 
-    def format_live_data_stats(self, results, columns):
-        rows = []
-        for result in results:
-            item = result.pop(0)
-            row = []
-            if item is None:
-                pass
-            elif len(item) == 1:
-                row.append(item.values().pop(0))
-            else:
-                for column in columns:
-                    attr = datamgr.get_column_attribute(self.query.table, column)
-                    row.append(item.get(attr, ""))
-            row.extend(result)
-            rows.append(row)
+    def format_live_data_stats(self, result, columns):
         if self.outputformat == "json":
-            return json.dumps(rows)
+            return json.dumps(result)
         elif self.outputformat.startswith("python"):
-            return repr(rows)
+            return repr(result)
         else:
             f = StringIO()
             writer = csv.writer(f,
                 delimiter=self.separators.field,
                 lineterminator=self.separators.line
             )
-            writer.writerow(rows)
+            writer.writerow(result)
             return f.getvalue()
 
     def format_live_data(self, results, columns):

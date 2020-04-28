@@ -70,9 +70,6 @@ class LiveStatus(object):
         if counters is None:
             counters = LiveStatusCounters()
         self.counters = counters
-        self.mongo_client = pymongo.MongoClient("localhost", 27017)
-        self.mongo_datamgr = mongo_datamgr
-        self.mongo_datamgr.load(self.mongo_client.livestatus)
 
     def handle_request(self, data):
         try:
@@ -108,7 +105,6 @@ class LiveStatus(object):
         request = LiveStatusRequest(
                 data,
                 self.datamgr,
-                self.mongo_datamgr,
                 self.db,
                 self.pnp_path,
                 self.return_queue,

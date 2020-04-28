@@ -30,7 +30,6 @@ import pymongo
 import bson
 
 from shinken.log import logger
-from mongo_mapping import table_class_map
 from livestatus_mongo_response import LiveStatusResponse
 from livestatus_mongo_response import Separators
 from livestatus_query_error import LiveStatusQueryError
@@ -45,6 +44,7 @@ class LiveStatusQuery(object):
     def __init__(self, datamgr, db, pnp_path, return_queue, counters):
         # Runtime data form the global LiveStatus object
         self.datamgr = datamgr
+        self.mapping = datamgr.mapping
         self.db = db
         self.pnp_path = pnp_path
         self.return_queue = return_queue
@@ -68,7 +68,6 @@ class LiveStatusQuery(object):
 
         # This is mostly used in the Response.format... which needs to know
         # the class behind a queries table
-        self.table_class_map = table_class_map
         self.filters_stack = self.datamgr.make_stack()
         self.aggregations_stack = self.datamgr.make_stack()
 
@@ -85,14 +84,14 @@ class LiveStatusQuery(object):
             'hostgroups':           self.get_filtered_livedata,
             'servicegroups':        self.get_filtered_livedata,
             'timeperiods':          self.get_filtered_livedata,
-            'downtimes':            self.get_list_livedata,
-            'comments':             self.get_list_livedata,
+            'downtimes':            self.get_filtered_livedata,
+            'comments':             self.get_filtered_livedata,
             'hostsbygroup':         self.get_filtered_livedata,
             'servicesbygroup':      self.get_filtered_livedata,
+            'servicesbyhostgroup':  self.get_filtered_livedata,
             'problems':             self.get_problem_livedata,
             'status':               self.get_status_livedata,
             'columns':              self.get_columns_livedata,
-            'servicesbyhostgroup':  self.get_filtered_livedata
         }
         self.operator_mapping = {
             "=":  self.datamgr.add_filter_eq,
@@ -126,7 +125,7 @@ class LiveStatusQuery(object):
     def split_option_with_columns(self, line):
         """Split a line in a command and a list of words"""
         cmd, columns = self.split_option(line)
-        mapping = table_class_map[self.table]
+        mapping = self.mapping[self.table]
         table_columns = mapping.keys()
         return cmd, [c for c in columns.split() if c in table_columns]
 
@@ -187,7 +186,7 @@ class LiveStatusQuery(object):
             keyword = line.split(' ')[0].rstrip(':')
             if keyword == 'GET':  # Get the name of the base table
                 _, self.table = self.split_command(line)
-                if self.table not in table_class_map.keys():
+                if self.table not in self.mapping.keys():
                     raise LiveStatusQueryError(404, self.table)
             elif keyword == 'Columns':  # Get the names of the desired columns
                 _, self.columns = self.split_option_with_columns(line)
@@ -403,7 +402,19 @@ class LiveStatusQuery(object):
                 group["stats"][i] = result["result"]
         rows = []
         for key, stats in sorted(results.items(), key=lambda r: r[0]):
-            row = [stats["group"]]
+            row = []
+            item = stats["group"]
+            if item is None:
+                pass
+            elif len(item) == 1:
+                row.append(item.values().pop(0))
+            else:
+                for column in self.columns:
+                    attr = self.datamgr.get_column_attribute(
+                        self.table,
+                        column
+                    )
+                    row.append(item.get(attr, ""))
             row.extend([
                 stats["stats"].get(i, 0)
                 for i in range(len(self.aggregations_stack))
@@ -539,7 +550,7 @@ class LiveStatusQuery(object):
             'description': 'The data type of the column (int, float, string, list)', 'name': 'type', 'table': 'columns', 'type': 'string'})
         tablenames = ['hosts', 'services', 'hostgroups', 'servicegroups', 'contacts', 'contactgroups', 'commands', 'downtimes', 'comments', 'timeperiods', 'status', 'log', 'hostsbygroup', 'servicesbygroup', 'servicesbyhostgroup', 'status']
         for table in tablenames:
-            cls = self.table_class_map[table][1]
+            cls = self.mapping[table][1]
             for attribute in cls.lsm_columns:
                 result.append({
                     'description': getattr(cls, 'lsm_' + attribute).im_func.description,

@@ -279,12 +279,10 @@ livestatus_attribute_map = {
         },
         'comments': {
             'description': 'A list of the ids of all comments of this host',
-            'function': lambda item: [], #FIXME
             'datatype': list,
         },
         'comments_with_info': {
             'description': 'A list of the ids of all comments of this host with id, author and comment',
-            'function': lambda item: [],  #FIXME
             'datatype': list,
         },
         'contacts': {
@@ -339,17 +337,11 @@ livestatus_attribute_map = {
         },
         'downtimes': {
             'description': 'A list of the ids of all scheduled downtimes of this host',
-            'function': lambda item: [], #FIXME
             'datatype': list,
-            'projection': [],
-            'filters': {},
         },
         'downtimes_with_info': {
             'description': 'A list of the all scheduled downtimes of the host with id, author and comment',
-            'function': lambda item: [], #FIXME
             'datatype': list,
-            'projection': [],
-            'filters': {},
         },
         'event_handler': {
             'description': 'Nagios command used as event handler',
@@ -424,6 +416,7 @@ livestatus_attribute_map = {
         },
         'impacts': {
             'description': 'List of what the source impact (list of hosts and services)',
+            'function': lambda item: [i.split("/") for i in item["impacts"]["hosts"] + item["impacts"]["services"]],
             'datatype': list,
             'filters': {},
         },
@@ -730,36 +723,32 @@ livestatus_attribute_map = {
             'description': 'Whether passive host checks are accepted (0/1)',
             'function': lambda item: linked_attr(item, "host", "passive_checks_enabled", True),
             'datatype': bool,
-            'projection': [
-                'host.passive_checks_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.passive_checks_enabled',
+            },
         },
         'host_acknowledged': {
             'description': 'Whether the current host problem has been acknowledged (0/1)',
             'function': lambda item: linked_attr(item, "host", "problem_has_been_acknowledged", False),
             'datatype': bool,
-            'projection': [
-                'host.problem_has_been_acknowledged',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.problem_has_been_acknowledged',
+            },
         },
         'host_acknowledgement_type': {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
             'function': lambda item: linked_attr(item, "host", "acknowledgement_type", 0),
             'datatype': int,
-            'projection': [
-                'host.acknowledgement_type',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.acknowledgement_type',
+            },
         },
         'host_action_url': {
             'description': 'An optional URL to custom actions or information about this host',
             'function': lambda item: linked_attr(item, "host", "action_url", ""),
-            'projection': [
-                'host.action_url',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.action_url',
+            },
         },
         'host_action_url_expanded': {
             'description': 'The same as action_url, but with the most important macros expanded',
@@ -771,76 +760,68 @@ livestatus_attribute_map = {
             'description': 'Whether active checks are enabled for the host (0/1)',
             'function': lambda item: linked_attr(item, "host", "active_checks_enabled", True),
             'datatype': bool,
-            'projection': [
-                'host.active_checks_enabled',
-            ],
+            'filters': {
+                'attr': 'host.active_checks_enabled',
+            },
         },
         'host_address': {
             'description': 'IP address',
             'function': lambda item: linked_attr(item, "host", "address"),
-            'projection': [
-                'host.address',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.address',
+            },
         },
         'host_alias': {
             'description': 'An alias name for the host',
             'function': lambda item: linked_attr(item, "host", "alias"),
-            'projection': [
-                'host.alias',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.alias',
+            },
         },
         'host_check_command': {
             'description': 'Nagios command used for active checks',
             'function': lambda item: linked_attr(item, "host", "check_command"),
-            'projection': [
-                'host.check_command',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.check_command',
+            },
         },
         'host_check_flapping_recovery_notification': {
             'description': 'Whether to check to send a recovery notification when flapping stops (0/1)',
             'function': lambda item: linked_attr(item, "host", "check_flapping_recovery_notification", 0),
             'datatype': int,
-            'projection': [
-                'host.check_flapping_recovery_notification',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.check_flapping_recovery_notification',
+            },
         },
         'host_check_freshness': {
             'description': 'Whether freshness checks are activated (0/1)',
             'function': lambda item: linked_attr(item, "host", "check_freshness", False),
             'datatype': bool,
-            'projection': [
-                'host.check_freshness',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.check_freshness',
+            },
         },
         'host_check_interval': {
             'description': 'Number of basic interval lengths between two scheduled checks of the host',
             'function': lambda item: linked_attr(item, "host", "check_interval", 0),
             'datatype': float,
-            'projection': [
-                'host.check_interval',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.check_interval',
+            },
         },
         'host_check_options': {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
             'function': lambda item: linked_attr(item, "host", "check_options"),
-            'projection': [
-                'host.check_options',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.check_options',
+            },
         },
         'host_check_period': {
             'description': 'Time period in which this host will be checked. If empty then the host will always be checked.',
             'function': lambda item: linked_attr(item, "host", "check_period"),
-            'projection': [
-                'host.period',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.check_period',
+            },
         },
         'host_check_type': {
             'description': 'Type of check (0: active, 1: passive)',
@@ -853,69 +834,65 @@ livestatus_attribute_map = {
             'description': 'Whether active checks of the host are enabled (0/1)',
             'function': lambda item: linked_attr(item, "host", "active_checks_enabled", True),
             'datatype': bool,
-            'projection': [
-                'host.active_checks_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.active_checks_enabled',
+            },
         },
         'host_childs': {
             'description': 'A list of all direct childs of the host',
             'function': lambda item: linked_attr(item, "host", "childs", []),
             'datatype': list,
-            'projection': ['host.childs'],
-            'filters': {},
+            'filters': {
+                'attr': 'host.childs'
+            },
         },
         'host_comments': {
             'description': 'A list of the ids of all comments of this host',
             'function': lambda item: linked_attr(item, "host", "comments", []),
             'datatype': list,
-            'projection': [
-                'host.comments',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.comments',
+            },
         },
         'host_comments_with_info': {
             'description': 'A list of all comments of the host with id, author and comment',
-            'function': lambda item: [],  #FIXME
+            'function': lambda item: linked_attr(item, "host", "comments_with_info", []),
             'datatype': list,
-            'projection': [],
-            'filters': {},
+            'filters': {
+                'attr': 'host.comments_with_info',
+            },
         },
         'host_contacts': {
             'description': 'A list of all contacts of this host, either direct or via a contact group',
             'function': lambda item: linked_attr(item, "host", "contacts", []),
             'datatype': list,
-            'projection': [
-                'host.contacts',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.contacts',
+            },
         },
         'host_contact_groups': {
             'description': 'A list of all contact groups this host is in',
             'function': lambda item: linked_attr(item, "host", "contact_groups", []),
             'datatype': list,
-            'projection': [
-                'host.contact_groups',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.contact_groups',
+            },
         },
         'host_current_attempt': {
             'description': 'Number of the current check attempts',
             'function': lambda item: linked_attr(item, "host", "attempt", 0),
             'datatype': int,
-            'projection': [
-                'host.attempt',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.attempt',
+            },
         },
         'host_current_notification_number': {
             'description': 'Number of the current notification',
             'function': lambda item: linked_attr(item, "host", "current_notification_number", 0),
             'datatype': int,
-            'projection': [
-                'host.current_notification_number',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.current_notification_number',
+            },
         },
         'host_custom_variables': {
             'description': 'A dictionary of the custom variables of the service',
@@ -941,51 +918,48 @@ livestatus_attribute_map = {
         'host_display_name': {
             'description': 'Optional display name of the host - not used by Nagios\' web interface',
             'function': lambda item: linked_attr(item, "host", "display_name"),
-            'projection': [
-                'host.display_name',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.display_name',
+            },
         },
         'host_downtimes': {
             'description': 'A list of the ids of all scheduled downtimes of this host',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: linked_attr(item, "host", "downtimes", []),
             'datatype': list,
-            'projection': [],
-            'filters': {},
+            'filters': {
+                'attr': 'host.downtimes'
+            },
         },
         'host_downtimes_with_info': {
             'description': 'A list of the all scheduled downtimes of the host with id, author and comment',
-
-            'function': lambda item: [], #FIXME
+            'function': lambda item: linked_attr(item, "host", "downtimes_with_info", []),
             'datatype': list,
-            'projection': [],
-            'filters': {},
+            'filters': {
+                'attr': 'host.downtimes_with_info'
+            },
         },
         'host_event_handler': {
             'description': 'Nagios command used as event handler of this host',
             'function': lambda item: linked_attr(item, "host", "event_handler"),
-            'projection': [
-                'host.event_handler',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.event_handler',
+            },
         },
         'host_event_handler_enabled': {
             'description': 'Whether event handling is enabled for the host (0/1)',
             'function': lambda item: linked_attr(item, "host", "event_handler_enabled", True),
             'datatype': bool,
-            'projection': [
-                'host.event_handler_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.event_handler_enabled',
+            },
         },
         'host_execution_time': {
             'description': 'Time the host check needed for execution',
             'function': lambda item: linked_attr(item, "host", "execution_time", 0),
             'datatype': float,
-            'projection': [
-                'host.execution_time',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.execution_time',
+            },
         },
         'host_filename': {
             'description': 'The value of the custom variable FILENAME',
@@ -997,70 +971,63 @@ livestatus_attribute_map = {
             'description': 'Delay before the first notification',
             'function': lambda item: linked_attr(item, "host", "first_notification_delay", 0),
             'datatype': float,
-            'projection': [
-                'host.first_notification_delay',
-            ],
+            'filters': {
+                'attr': 'host.first_notification_delay',
+            },
         },
         'host_flap_detection_enabled': {
             'description': 'Whether flap detection is enabled (0/1)',
             'function': lambda item: linked_attr(item, "host", "flap_detection_enabled", True),
             'datatype': bool,
-            'projection': [
-                'host.flap_detection_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.flap_detection_enabled',
+            },
         },
         'host_groups': {
             'description': 'A list of all host groups this host is in',
             'function': lambda item: linked_attr(item, "host", "hostgroups", []),
             'datatype': list,
-            'projection': [
-                'host.hostgroups',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.hostgroups',
+            },
         },
         'host_hard_state': {
             'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
             'function': lambda item: linked_attr(item, "host", "hard_state", 0),
             'datatype': int,
-            'projection': [
-                'host.hard_state',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.hard_state',
+            },
         },
         'host_has_been_checked': {
             'description': 'Whether the host has already been checked (0/1)',
             'function': lambda item: linked_attr(item, "host", "has_been_checked", True),
             'datatype': bool,
-            'projection': [
-                'host.has_been_checked',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.has_been_checked',
+            },
         },
         'host_high_flap_threshold': {
             'description': 'High threshold of flap detection',
             'function': lambda item: linked_attr(item, "host", "high_flap_threshold", 0),
             'datatype': float,
-            'projection': [
-                'host.high_flap_threshold',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.high_flap_threshold',
+            },
         },
         'host_icon_image': {
             'description': 'The name of an image file to be used in the web pages',
             'function': lambda item: linked_attr(item, "host", "icon_image"),
-            'projection': [
-                'host.icon_image',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.icon_image',
+            },
         },
         'host_icon_image_alt': {
             'description': 'Alternative text for the icon_image',
             'function': lambda item: linked_attr(item, "host", "icon_image_alt"),
-            'projection': [
-                'host.icon_image_alt',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.icon_image_alt',
+            },
         },
         'host_icon_image_expanded': {
             'description': 'The same as icon_image, but with the most important macros expanded',
@@ -1086,10 +1053,9 @@ livestatus_attribute_map = {
             'description': 'Initial host state',
             'function': lambda item: linked_attr(item, "host", "initial_state"),
             'datatype': int,
-            'projection': [
-                'host.initial_state',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.initial_state',
+            },
         },
         'host_is_executing': {
             'description': 'is there a host check currently running... (0/1)',
@@ -1101,134 +1067,119 @@ livestatus_attribute_map = {
             'description': 'Whether the host state is flapping (0/1)',
             'function': lambda item: linked_attr(item, "host", "is_flapping", False),
             'datatype': bool,
-            'projection': [
-                'host.is_flapping',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.is_flapping',
+            },
         },
         'host_last_check': {
             'description': 'Time of the last check (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_chk", 0),
             'datatype': int,
-            'projection': [
-                'host.last_chk',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_chk',
+            },
         },
         'host_last_hard_state': {
             'description': 'Last hard state',
             'function': lambda item: linked_attr(item, "host", "last_hard_state_id", 0),
             'datatype': int,
-            'projection': [
-                'host.last_hard_state_id',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_hard_state_id',
+            },
         },
         'host_last_hard_state_change': {
             'description': 'Time of the last hard state change (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_hard_state_change", 0),
             'datatype': int,
-            'projection': [
-                'host.last_hard_state_change',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_hard_state_change',
+            },
         },
         'host_last_notification': {
             'description': 'Time of the last notification (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_notification", 0),
             'datatype': int,
-            'projection': [
-                'host.last_notification',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_notification',
+            },
         },
         'host_last_state': {
             'description': 'State before last state change',
             'function': lambda item: linked_attr(item, "host", "last_state"),
-            'projection': [
-                'host.last_state',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_state',
+            },
         },
         'host_last_state_change': {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_state_change", 0),
             'datatype': int,
-            'projection': [
-                'host.last_state_change',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_state_change',
+            },
         },
         'host_last_time_down': {
             'description': 'The last time the host was DOWN (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_time_down", 0),
             'datatype': int,
-            'projection': [
-                'host.last_time_down',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_time_down',
+            },
         },
         'host_last_time_unreachable': {
             'description': 'The last time the host was UNREACHABLE (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_time_unreachable", 0),
             'datatype': int,
-            'projection': [
-                'host.last_time_unreachable',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_time_unreachable',
+            },
         },
         'host_last_time_up': {
             'description': 'The last time the host was UP (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "last_time_up", 0),
             'datatype': int,
-            'projection': [
-                'host.last_time_up',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.last_time_up',
+            },
         },
         'host_latency': {
             'description': 'Time difference between scheduled check time and actual check time',
             'function': lambda item: linked_attr(item, "host", "latency", 0),
             'datatype': float,
-            'projection': [
-                'host.latency',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.latency',
+            },
         },
         'host_long_plugin_output': {
             'description': 'Complete output from check plugin',
             'function': lambda item: linked_attr(item, "host", "long_output"),
-            'projection': [
-                'host.long_output',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.long_output',
+            },
         },
         'host_low_flap_threshold': {
             'description': 'Low threshold of flap detection',
             'function': lambda item: linked_attr(item, "host", "low_flap_threshold", 0),
             'datatype': float,
-            'projection': [
-                'host.low_flap_threshold',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.low_flap_threshold',
+            },
         },
         'host_max_check_attempts': {
             'description': 'Max check attempts for active host checks',
             'function': lambda item: linked_attr(item, "host", "max_checks_attempts", 0),
             'datatype': int,
-            'projection': [
-                'host.max_checks_attempts',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.max_checks_attempts',
+            },
         },
         'host_modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': [
-                'host.modified_attributes',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.modified_attributes',
+            },
         },
         'host_modified_attributes_list': {
             'description': 'A list of all modified attributes',
@@ -1238,15 +1189,18 @@ livestatus_attribute_map = {
         },
         'host_name': {
             'description': 'Host name',
+            'function': lambda item: linked_attr(item, "host", "host_name"),
+            'filters': {
+                'attr': 'host.host_name'
+            },
         },
         'host_next_check': {
             'description': 'Scheduled time for the next check (Unix timestamp)',
             'function': lambda item: linked_attr(item, "host", "next_chk", 0),
             'datatype': int,
-            'projection': [
-                'host.next_chk',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.next_chk',
+            },
         },
         'host_next_notification': {
             'description': 'Time of the next notification (Unix timestamp)',
@@ -1257,10 +1211,9 @@ livestatus_attribute_map = {
         'host_notes': {
             'description': 'Optional notes about the service',
             'function': lambda item: linked_attr(item, "host", "notes"),
-            'projection': [
-                'host.notes',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.notes',
+            },
         },
         'host_notes_expanded': {
             'description': 'The same as notes, but with the most important macros expanded',
@@ -1271,15 +1224,14 @@ livestatus_attribute_map = {
         'host_notes_url': {
             'description': 'An optional URL with further information about the host',
             'function': lambda item: linked_attr(item, "host", "notes_url"),
-            'projection': [
-                'host.notes_url',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.notes_url',
+            },
         },
         'host_notes_url_expanded': {
             'description': 'Same es notes_url, but with the most important macros expanded',
             'function': lambda item: '', #FIXME
-            'filters': {},
+            'projectino': [],
             'filters': {},
         },
         'host_notification_interval': {
@@ -1303,19 +1255,17 @@ livestatus_attribute_map = {
             'description': 'Whether notifications of the host are enabled (0/1)',
             'function': lambda item: linked_attr(item, "host", "notifications_enabled", True),
             'datatype': bool,
-            'projection': [
-                'host.notifications_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.notifications_enabled',
+            },
         },
         'host_no_more_notifications': {
             'description': 'Whether to stop sending notifications (0/1)',
             'function': lambda item: linked_attr(item, "host", "no_more_notifications", True),
             'datatype': bool,
-            'projection': [
-                'host.no_more_notifications',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.no_more_notifications',
+            },
         },
         'host_num_services': {
             'description': 'The total number of services of the host',
@@ -1407,35 +1357,31 @@ livestatus_attribute_map = {
             'description': 'Whether a flex downtime is pending (0/1)',
             'function': lambda item: linked_attr(item, "host", "pending_flex_downtimes", 0),
             'datatype': int,
-            'projection': [
-                'host.pending_flex_downtimes',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.pending_flex_downtimes',
+            },
         },
         'host_percent_state_change': {
             'description': 'Percent state change',
             'function': lambda item: linked_attr(item, "host", "percent_state_change", 0),
             'datatype': float,
-            'projection': [
-                'host.percent_state_change',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.percent_state_change',
+            },
         },
         'host_perf_data': {
             'description': 'Optional performance data of the last host check',
             'function': lambda item: linked_attr(item, "host", "perf_data"),
-            'projection': [
-                'host.perf_data',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.perf_data',
+            },
         },
         'host_plugin_output': {
             'description': 'Output of the last host check',
             'function': lambda item: linked_attr(item, "host", "output"),
-            'projection': [
-                'host.output',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.output',
+            },
         },
         'host_pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this host (0/1)',
@@ -1448,28 +1394,25 @@ livestatus_attribute_map = {
             'description': 'Whether processing of performance data is enabled (0/1)',
             'function': lambda item: linked_attr(item, "host", "process_performances_data", True),
             'datatype': bool,
-            'projection': [
-                'host.process_performances_data',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.process_performances_data',
+            },
         },
         'host_retry_interval': {
             'description': 'Number of basic interval lengths between checks when retrying after a soft error',
             'function': lambda item: linked_attr(item, "host", "retry_interval", 0),
             'datatype': float,
-            'projection': [
-                'host.retry_interval',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.retry_interval',
+            },
         },
         'host_scheduled_downtime_depth': {
             'description': 'The number of downtimes this host is currently in',
             'function': lambda item: linked_attr(item, "host", "scheduled_downtime_depth", 0),
             'datatype': int,
-            'projection': [
-                'host.scheduled_downtime_depth',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.scheduled_downtime_depth',
+            },
         },
         'host_services_with_info': {
             'description': 'A list of all services including detailed information about each service',
@@ -1496,36 +1439,32 @@ livestatus_attribute_map = {
             'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
             'function': lambda item: linked_attr(item, "host", "state_id", 0),
             'datatype': int,
-            'projection': [
-                'host.state_id',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.state_id',
+            },
         },
         'host_state_type': {
             'description': 'Type of the current state (0: soft, 1: hard)',
             'function': lambda item: linked_attr(item, "host", "state_type_id", 0),
             'datatype': int,
-            'projection': [
-                'host.state_type_id',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.state_type_id',
+            },
         },
         'host_statusmap_image': {
             'description': 'The name of in image file for the status map',
             'function': lambda item: linked_attr(item, "host", "statusmap_image"),
-            'projection': [
-                'host.statusmap_image',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.statusmap_image',
+            },
         },
         'host_tags': {
             'description': 'The list of Host Tags',
             'function': lambda item: linked_attr(item, "host", "tags", []),
             'datatype': list,
-            'projection': [
-                'host.tags',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'host.tags',
+            },
         },
         'host_total_services': {
             'description': 'The total number of services of the host',
@@ -1642,21 +1581,17 @@ livestatus_attribute_map = {
         },
         'child_dependencies': {
             'description': 'List of the host/service that depend on this service (logical, network or business one).',
+            'function': lambda item: item["impacts"]["hosts"] + item["impacts"]["services"],
             'datatype': list,
             'filters': {},
         },
         'comments': {
             'description': 'A list of all comment ids of the service',
-            'function': lambda item: [x.id for x in item.comments],
             'datatype': list,
-            'filters': {},
         },
         'comments_with_info': {
             'description': 'A list of the ids of all comments of this service with id, author and comment',
-            'function': lambda item: '', #FIXME
             'datatype': list,
-            'projection': [],
-            'filters': {},
         },
         'contacts': {
             'description': 'A list of all contacts of the service, either direct or via a contact group',
@@ -1717,14 +1652,10 @@ livestatus_attribute_map = {
         'downtimes': {
             'description': 'A list of all downtime ids of the service',
             'datatype': list,
-            'filters': {},
         },
         'downtimes_with_info': {
             'description': 'A list of all downtimes of the service with id, author and comment',
-            'function': lambda item: [], #FIXME
             'datatype': list,
-            'projection': [],
-            'filters': {},
         },
         'event_handler': {
             'description': 'Nagios command used as event handler',
@@ -1764,6 +1695,9 @@ livestatus_attribute_map = {
             'description': 'High threshold of flap detection',
             'datatype': float,
         },
+        'host_name': {
+            'description': 'The service\'s host name',
+        },
         'icon_image': {
             'description': 'The name of an image to be used as icon in the web interface',
         },
@@ -1778,6 +1712,7 @@ livestatus_attribute_map = {
         },
         'impacts': {
             'description': 'List of what the source impact (list of hosts and services)',
+            'function': lambda item: [i.split("/") for i in item["impacts"]["hosts"] + item["impacts"]["services"]],
             'datatype': list,
         },
         'in_check_period': {
@@ -2020,36 +1955,32 @@ livestatus_attribute_map = {
             'description': 'Whether passive service checks are accepted (0/1)',
             'function': lambda item: linked_attr(item, "service", "passive_checks_enabled", True),
             'datatype': bool,
-            'projection': [
-                'service.passive_checks_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.passive_checks_enabled',
+            },
         },
         'service_acknowledged': {
             'description': 'Whether the current service problem has been acknowledged (0/1)',
             'function': lambda item: linked_attr(item, "service", "problem_has_been_acknowledged", False),
             'datatype': bool,
-            'projection': [
-                'service.problem_has_been_acknowledged',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.problem_has_been_acknowledged',
+            },
         },
         'service_acknowledgement_type': {
             'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
             'function': lambda item: linked_attr(item, "service", "acknowledgement_type", 0),
             'datatype': int,
-            'projection': [
-                'service.acknowledgement_type',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.acknowledgement_type',
+            },
         },
         'service_action_url': {
             'description': 'An optional URL to custom actions or information about this service',
             'function': lambda item: linked_attr(item, "service", "action_url"),
-            'projection': [
-                'service.action_url',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.action_url',
+            },
         },
         'service_action_url_expanded': {
             'description': 'The same as action_url, but with the most important macros expanded',
@@ -2061,44 +1992,39 @@ livestatus_attribute_map = {
             'description': 'Whether active checks are enabled for the service (0/1)',
             'function': lambda item: linked_attr(item, "service", "active_checks_enabled", True),
             'type': bool,
-            'projection': [
-                'service.active_checks_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.active_checks_enabled',
+            },
         },
         'service_check_command': {
             'description': 'Nagios command used for active checks',
             'function': lambda item: linked_attr(item, "service", "check_command"),
-            'projection': [
-                'service.check_command',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.check_command',
+            },
         },
         'service_check_interval': {
             'description': 'Number of basic interval lengths between two scheduled checks of the service',
             'function': lambda item: linked_attr(item, "service", "check_interval", 0),
             'datatype': float,
-            'projection': [
-                'service.check_interval',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.check_interval',
+            },
         },
         'service_check_options': {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
             'function': lambda item: linked_attr(item, "service", "check_options"),
             'type': list,
-            'projection': [
-                'service.check_options',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.check_options',
+            },
         },
         'service_check_period': {
             'description': 'Time period in which this service will be checked. If empty then the service will always be checked.',
             'function': lambda item: linked_attr(item, "service", "check_period"),
-            'projection': [
-                'service.check_period',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.check_period',
+            },
         },
         'service_check_type': {
             'description': 'Type of check (0: active, 1: passive)',
@@ -2111,62 +2037,57 @@ livestatus_attribute_map = {
             'description': 'Whether active checks of the service are enabled (0/1)',
             'function': lambda item: linked_attr(item, "service", "checks_enabled", True),
             'datatype': bool,
-            'projection': [
-                'service.checks_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.checks_enabled',
+            },
         },
         'service_comments': {
             'description': 'A list of the ids of all comments of this service',
             'function': lambda item: linked_attr(item, "service", "comments", []),
             'datatype': list,
-            'projection': [
-                'service.comments',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.comments',
+            },
         },
         'service_comments_with_info': {
             'description': 'A list of all comments of the service with id, author and comment',
-            'function': lambda item: [],  #FIXME
+            'function': lambda item: linked_attr(item, "host", "comments_with_info", []),
             'datatype': list,
-            'projection': [],
-            'filters': {},
+            'filters': {
+                'attr': 'service.comments_with_info',
+            },
         },
         'service_contacts': {
             'description': 'A list of all contacts of this service, either direct or via a contact group',
             'function': lambda item: linked_attr(item, "service", "contacts", []),
             'datatype': list,
-            'projection': [
-                'service.contacts',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.contacts',
+            },
         },
         'service_contact_groups': {
             'description': 'A list of all contact groups this service is in',
             'function': lambda item: linked_attr(item, "service", "contact_groups", []),
             'datatype': list,
-            'projection': [
-                'service.contact_groups',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.contact_groups',
+            },
         },
         'service_current_attempt': {
             'description': 'Number of the current check attempts',
             'function': lambda item: linked_attr(item, "service", "attempt", 0),
             'datatype': int,
-            'projection': [
-                'service.attempt',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.attempt',
+            },
         },
         'service_current_notification_number': {
             'description': 'Number of the current notification',
             'function': lambda item: linked_attr(item, "service", "current_notification_number", 0),
             'datatype': int,
-            'projection': [
-                'service.current_notification_number',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.current_notification_number',
+            },
         },
         'service_custom_variables': {
             'description': 'A dictionary of the custom variables of the service',
@@ -2192,114 +2113,103 @@ livestatus_attribute_map = {
         'service_display_name': {
             'description': 'Optional display name of the service - not used by Nagios\' web interface',
             'function': lambda item: linked_attr(item, "service", "display_name"),
-            'projection': [
-                'service.display_name',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.display_name',
+            },
         },
         'service_downtimes': {
             'description': 'A list of the ids of all scheduled downtimes of this service',
             'function': lambda item: linked_attr(item, "service", "downtimes", []),
             'datatype': list,
-            'projection': [
-                'service.display_name',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.downtimes'
+            },
         },
         'service_downtimes_with_info': {
             'description': 'A list of the all scheduled downtimes of the service with id, author and comment',
+            'function': lambda item: linked_attr(item, "service", "downtimes_with_info", []),
 
-            'function': lambda item: [], #FIXME
             'datatype': list,
-            'projection': [],
-            'filters': {},
+            'filters': {
+                'attr': 'service.downtimes_with_info'
+            },
         },
         'service_event_handler': {
             'description': 'Nagios command used as event handler of this service',
             'function': lambda item: linked_attr(item, "service", "event_handler"),
-            'projection': [
-                'service.event_handler',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.event_handler',
+            },
         },
         'service_event_handler_enabled': {
             'description': 'Whether event handling is enabled for the service (0/1)',
             'function': lambda item: linked_attr(item, "service", "event_handler_enabled", True),
             'datatype': bool,
-            'projection': [
-                'service.event_handler_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.event_handler_enabled',
+            },
         },
         'service_execution_time': {
             'description': 'Time the service check needed for execution',
             'function': lambda item: linked_attr(item, "service", "execution_time", 0),
             'datatype': float,
-            'projection': [
-                'service.execution_time',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.execution_time',
+            },
         },
         'service_first_notification_delay': {
             'description': 'Delay before the first notification',
             'function': lambda item: linked_attr(item, "service", "first_notification_delay", 0),
             'datatype': float,
-            'projection': [
-                'service.first_notification_delay',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.first_notification_delay',
+            },
         },
         'service_flap_detection_enabled': {
             'description': 'Whether flap detection is enabled (0/1)',
             'function': lambda item: linked_attr(item, "service", "flap_detection_enabled", True),
             'datatype': bool,
-            'projection': [
-                'service.flap_detection_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.flap_detection_enabled',
+            },
         },
         'service_groups': {
             'description': 'A list of all service groups this service is in',
             'function': lambda item: linked_attr(item, "service", "servicegroups", []),
             'datatype': list,
-            'projection': [
-                'service.servicegroups',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.servicegroups',
+            },
         },
         'service_has_been_checked': {
             'description': 'Whether the service has already been checked (0/1)',
             'function': lambda item: linked_attr(item, "service", "has_been_checked", False),
             'datatype': bool,
-            'projection': [
-                'service.has_been_checked',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.has_been_checked',
+            },
         },
         'service_high_flap_threshold': {
             'description': 'High threshold of flap detection',
             'function': lambda item: linked_attr(item, "service", "high_flap_threshold", 0),
             'datatype': float,
-            'projection': [
-                'service.high_flap_threshold',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.high_flap_threshold',
+            },
         },
         'service_icon_image': {
             'description': 'The name of an image file to be used in the web pages',
             'function': lambda item: linked_attr(item, "service", "icon_image"),
-            'projection': [
-                'service.icon_image',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.icon_image',
+            },
         },
         'service_icon_image_alt': {
             'description': 'Alternative text for the icon_image',
             'function': lambda item: linked_attr(item, "service", "icon_image_alt"),
-            'projection': [
-                'service.icon_image_alt',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.icon_image_alt',
+            },
         },
         'service_icon_image_expanded': {
             'description': 'The same as icon_image, but with the most important macros expanded',
@@ -2324,10 +2234,9 @@ livestatus_attribute_map = {
         'service_initial_state': {
             'description': 'Initial service state',
             'function': lambda item: linked_attr(item, "service", "initial_state"),
-            'projection': [
-                'service.initial_state',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.initial_state',
+            },
         },
         'service_is_executing': {
             'description': 'is there a service check currently running... (0/1)',
@@ -2340,134 +2249,119 @@ livestatus_attribute_map = {
             'description': 'Whether the service state is flapping (0/1)',
             'function': lambda item: linked_attr(item, "service", "is_flapping", False),
             'datatype': bool,
-            'projection': [
-                'service.is_flapping',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.is_flapping',
+            },
         },
         'service_last_check': {
             'description': 'Time of the last check (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_chk", 0),
             'datatype': int,
-            'projection': [
-                'service.last_chk',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_chk',
+            },
         },
         'service_last_hard_state': {
             'description': 'Last hard state',
             'function': lambda item: linked_attr(item, "service", "last_hard_state_id", 0),
             'datatype': int,
-            'projection': [
-                'service.last_hard_state_id',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_hard_state_id',
+            },
         },
         'service_last_hard_state_change': {
             'description': 'Time of the last hard state change (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_hard_state_change", 0),
             'datatype': int,
-            'projection': [
-                'service.last_hard_state_change',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_hard_state_change',
+            },
         },
         'service_last_notification': {
             'description': 'Time of the last notification (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_notification", 0),
             'datatype': int,
-            'projection': [
-                'service.last_notification',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_notification',
+            },
         },
         'service_last_state': {
             'description': 'State before last state change',
             'function': lambda item: linked_attr(item, "service", "last_state"),
-            'projection': [
-                'service.last_state',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_state',
+            },
         },
         'service_last_state_change': {
             'description': 'Time of the last state change - soft or hard (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_state_change", 0),
             'datatype': int,
-            'projection': [
-                'service.last_state_change',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_state_change',
+            },
         },
         'service_last_time_down': {
             'description': 'The last time the service was DOWN (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_time_down", 0),
             'datatype': int,
-            'projection': [
-                'service.last_time_down',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_time_down',
+            },
         },
         'service_last_time_unreachable': {
             'description': 'The last time the service was UNREACHABLE (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_time_unreachable", 0),
             'datatype': int,
-            'projection': [
-                'service.last_time_unreachable',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_time_unreachable',
+            },
         },
         'service_last_time_up': {
             'description': 'The last time the service was UP (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "last_time_up", 0),
             'datatype': int,
-            'projection': [
-                'service.last_time_up',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.last_time_up',
+            },
         },
         'service_latency': {
             'description': 'Time difference between scheduled check time and actual check time',
             'function': lambda item: linked_attr(item, "service", "latency", 0),
             'datatype': float,
-            'projection': [
-                'service.latency',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.latency',
+            },
         },
         'service_long_plugin_output': {
             'description': 'Complete output from check plugin',
             'function': lambda item: linked_attr(item, "service", "long_output"),
-            'projection': [
-                'service.long_output',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.long_output',
+            },
         },
         'service_low_flap_threshold': {
             'description': 'Low threshold of flap detection',
             'function': lambda item: linked_attr(item, "service", "low_flap_threshold", 0),
             'datatype': float,
-            'projection': [
-                'service.low_flap_threshold',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.low_flap_threshold',
+            },
         },
         'service_max_check_attempts': {
             'description': 'Max check attempts for active service checks',
             'function': lambda item: linked_attr(item, "service", "max_checks_attempts", 0),
             'datatype': int,
-            'projection': [
-                'service.max_checks_attempts',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.max_checks_attempts',
+            },
         },
         'service_modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
             'function': lambda item: len(linked_attr(item, "service", "modified_attributes", 0)),
             'datatype': int,
-            'projection': [
-                'service.modified_attributes',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.modified_attributes',
+            },
         },
         'service_modified_attributes_list': {
             'description': 'A list of all modified attributes',
@@ -2480,27 +2374,24 @@ livestatus_attribute_map = {
             'description': 'Scheduled time for the next check (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "next_chk", 0),
             'datatype': int,
-            'projection': [
-                'service.next_chk',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.next_chk',
+            },
         },
         'service_next_notification': {
             'description': 'Time of the next notification (Unix timestamp)',
             'function': lambda item: linked_attr(item, "service", "next_notification", 0),
             'datatype': int,
-            'projection': [
-                'service.next_notifications',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.next_notifications',
+            },
         },
         'service_notes': {
             'description': 'Optional notes about the service',
             'function': lambda item: linked_attr(item, "service", "notes"),
-            'projection': [
-                'service.notes',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.notes',
+            },
         },
         'service_notes_expanded': {
             'description': 'The same as notes, but with the most important macros expanded',
@@ -2511,10 +2402,9 @@ livestatus_attribute_map = {
         'service_notes_url': {
             'description': 'An optional URL with further information about the service',
             'function': lambda item: linked_attr(item, "service", "notes_url"),
-            'projection': [
-                'service.notes_url',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.notes_url',
+            },
         },
         'service_notes_url_expanded': {
             'description': 'Same es notes_url, but with the most important macros expanded',
@@ -2526,61 +2416,54 @@ livestatus_attribute_map = {
             'description': 'Interval of periodic notification or 0 if its off',
             'function': lambda item: linked_attr(item, "service", "notification_interval", 0),
             'datatype': float,
-            'projection': [
-                'service.notification_interval',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.notification_interval',
+            },
         },
         'service_notification_period': {
             'description': 'Time period in which problems of this service will be notified. If empty then notification will be always',
             'function': lambda item: linked_attr(item, "service", "notification_period"),
-            'projection': [
-                'service.notification_period',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.notification_period',
+            },
         },
         'service_notifications_enabled': {
             'description': 'Whether notifications of the service are enabled (0/1)',
             'function': lambda item: linked_attr(item, "service", "notifications_enabled", True),
             'datatype': bool,
-            'projection': [
-                'service.notifications_enabled',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.notifications_enabled',
+            },
         },
         'service_no_more_notifications': {
             'description': 'Whether to stop sending notifications (0/1)',
             'function': lambda item: linked_attr(item, "service", "no_more_notifications", True),
             'datatype': bool,
-            'projection': [
-                'service.no_more_notifications',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.no_more_notifications',
+            },
         },
         'service_percent_state_change': {
             'description': 'Percent state change',
             'function': lambda item: linked_attr(item, "service", "percent_state_change", 0),
             'datatype': float,
-            'projection': [
-                'service.percent_state_change',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.percent_state_change',
+            },
         },
         'service_perf_data': {
             'description': 'Optional performance data of the last service check',
             'function': lambda item: linked_attr(item, "service", "perf_data"),
-            'projection': [
-                'service.perf_data',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.perf_data',
+            },
         },
         'service_plugin_output': {
             'description': 'Output of the last service check',
             'function': lambda item: linked_attr(item, "service", "output"),
-            'projection': [
-                'service.output',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.output',
+            },
         },
         'service_pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this service (0/1)',
@@ -2593,46 +2476,41 @@ livestatus_attribute_map = {
             'description': 'Whether processing of performance data is enabled (0/1)',
             'function': lambda item: linked_attr(item, "service", "process_performances_data", True),
             'datatype': bool,
-            'projection': [
-                'service.process_performances_data',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.process_performances_data',
+            },
         },
         'service_retry_interval': {
             'description': 'Number of basic interval lengths between checks when retrying after a soft error',
             'function': lambda item: linked_attr(item, "service", "retry_interval", 0),
             'datatype': float,
-            'projection': [
-                'service.retry_interval',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.retry_interval',
+            },
         },
         'service_scheduled_downtime_depth': {
             'description': 'The number of downtimes this service is currently in',
             'function': lambda item: linked_attr(item, "service", "scheduled_downtime_depth", 0),
             'datatype': int,
-            'projection': [
-                'service.scheduled_downtime_depth',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.scheduled_downtime_depth',
+            },
         },
         'service_state': {
             'description': 'The current state of the service (0: up, 1: down, 2: unreachable)',
             'function': lambda item: linked_attr(item, "service", "state_id", 0),
             'datatype': int,
-            'projection': [
-                'service.state_id',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.state_id',
+            },
         },
         'service_state_type': {
             'description': 'Type of the current state (0: soft, 1: hard)',
             'function': lambda item: linked_attr(item, "service", "state_type_id", 0),
             'datatype': int,
-            'projection': [
-                'service.state_type_id',
-            ],
-            'filters': {},
+            'filters': {
+                'attr': 'service.state_type_id',
+            },
         },
     },
     'ServicesLink': {
@@ -2859,52 +2737,6 @@ livestatus_attribute_map = {
         'notes_url': {
             'description': 'An optional URL with further information about the hostgroup',
         },
-        'num_hosts': {
-            'description': 'The total number of hosts in the group',
-            'function': lambda item: len(item.members),
-            'projection': ["hosts.host_name"],
-        },
-        'num_hosts_down': {
-            'description': 'The number of hosts in the group that are down',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["hosts.state_id"],
-            'filters': {},
-        },
-        'num_hosts_pending': {
-            'description': 'The number of hosts in the group that are pending',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["hosts.state_id"],
-            'filters': {},
-        },
-        'num_hosts_unreach': {
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["hosts.state_id"],
-            'filters': {},
-        },
-        'num_hosts_up': {
-            'description': 'The number of hosts in the group that are up',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["hosts.state_id"],
-            'filters': {},
-        },
-        'num_services': {
-            'description': 'The total number of services of hosts in this group',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["services.state_id"],
-            'filters': {},
-        },
-        'worst_host_state': {
-            'description': 'The worst state of all of the groups\' hosts (UP <= UNREACHABLE <= DOWN)',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["services.state_id"],
-            'filters': {},
-        },
     },
     'Servicegroup': {
         'action_url': {
@@ -2935,18 +2767,6 @@ livestatus_attribute_map = {
         },
         'notes_url': {
             'description': 'An optional URL to further notes on the service group',
-        },
-        'num_services': {
-            'description': 'The total number of services in the group',
-            'function': lambda item: len(item["members"]),
-            'datatype': int,
-        },
-        'num_services_crit': {
-            'description': 'The number of services in the group that are CRIT',
-            'function': lambda item: 0, #FIXME
-            'datatype': int,
-            'projection': ["services.state_id"],
-            'filters': {},
         },
     },
     'Contact': {
@@ -3255,7 +3075,7 @@ livestatus_attribute_map = {
         },
         'is_service': {
             'description': '0, if this entry is for a host, 1 if it is for a service',
-            'function': lambda item: 'service_description' in item["ref"],
+            'function': lambda item: item.get("service") is not None,
             'datatype': bool,
         },
         'start_time': {
@@ -4834,34 +4654,28 @@ livestatus_attribute_map = {
     },
 }
 
+def import_mapping(import_from, import_to):
+    mapping_from = livestatus_attribute_map[import_from]
+    mapping_to = livestatus_attribute_map[import_to]
+    for attr, mapping in mapping_from.items():
+        if attr not in mapping_to:
+            mapping_to[attr] = mapping_from[attr]
+
+
 # Updates Service, Downtime and Comment classe definitions with HostLink
 # and ServiceLink attributes
 for class_map in ("Comment", "Downtime", "Service"):
-    livestatus_attribute_map[class_map].update(
-        livestatus_attribute_map["HostLink"]
-    )
+    import_mapping("HostLink", class_map)
 for class_map in ("Comment", "Downtime"):
-    livestatus_attribute_map[class_map].update(
-        livestatus_attribute_map["ServiceLink"]
-    )
+    import_mapping("ServiceLink", class_map)
 for class_map in ('Host', 'Hostgroup', 'Servicegroup'):
-    livestatus_attribute_map[class_map].update(
-        livestatus_attribute_map["ServicesLink"]
-    )
+    import_mapping("ServicesLink", class_map)
 for class_map in ('Hostgroup', 'Servicegroup'):
-    livestatus_attribute_map[class_map].update(
-        livestatus_attribute_map["HostsLink"]
-    )
+    import_mapping("HostsLink", class_map)
 for class_map in ("Hostsbygroup",):
-    livestatus_attribute_map[class_map].update(
-        livestatus_attribute_map["Host"]
-    )
+    import_mapping("Host", class_map)
 for class_map in ("Servicesbygroup", "Servicesbyhostgroup"):
-    # The group parameter semantic can be different is some tables
-    # We keep the more specialized version
-    livestatus_attribute_map[class_map].update(
-        livestatus_attribute_map["Service"]
-    )
+    import_mapping("Service", class_map)
 
 table_class_map = {
     'hosts': livestatus_attribute_map['Host'],

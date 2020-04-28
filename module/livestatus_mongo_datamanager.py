@@ -34,6 +34,8 @@ import re
 
 class DataManager(object):
 
+    mapping = table_class_map
+
     def __init__(self):
         self.db = None
 
@@ -48,7 +50,16 @@ class DataManager(object):
         elif isinstance(obj, list):
             return [self.normalize(o) for o in obj]
         elif isinstance(obj, dict):
-            return dict([(k, self.normalize(v)) for k, v in obj.items()])
+            return dict([
+                (k, self.normalize(v)) for k, v in obj.items()
+            ])
+        elif hasattr(obj, "properties"):
+            properties = ["id"]
+            properties.extend(getattr(obj, "properties", {}).keys())
+            properties.extend(getattr(obj, "running_properties", {}).keys())
+            return dict([
+                (p, getattr(obj, p, "")) for p in properties
+            ])
         else:
             return obj
 
@@ -450,6 +461,34 @@ class DataManager(object):
                 continue
             else:
                 data[name] = self.normalize(value)
+
+        # Manages downtimes and comments for hosts and services
+        if "downtimes" in data:
+            data["downtimes_with_info"] = []
+            for i, downtime in enumerate(data["downtimes"]):
+                self.db.downtimes.update(
+                    {"_id": downtime["id"]},
+                    {"$set": downtime},
+                    upsert=True
+                )
+                data["downtimes"][i] = downtime["id"]
+                data["downtimes_with_info"].append(
+                    (downtime["id"], downtime["author"], downtime["comment"])
+                )
+
+        if "comments" in data:
+            data["comments_with_info"] = []
+            for i, comment in enumerate(data["comments"]):
+                self.db.comments.update(
+                    {"_id": comment["id"]},
+                    {"$set": comment},
+                    upsert=True
+                )
+                data["comments"][i] = comment["id"]
+                data["comments_with_info"].append(
+                    (comment["id"], comment["author"], comment["comment"])
+                )
+
         # Insert brok into database
         # Services are particular because their name is a combination of
         # host_name and service_description
@@ -461,6 +500,20 @@ class DataManager(object):
         else:
             object_name = data["%s_name" % object_type]
         data["_id"] = object_name
+
+#        if brok.data.get("host_name") == "test_host_005":
+#            if "host" in brok.type:
+#                print("*************************************")
+#                print("Brok type: %s" % brok.type)
+#                pprint(data)
+#                print("*************************************")
+#            elif "service" in brok.type and \
+#                    brok.data.get("service_description") == "test_ok_00":
+#                print("*************************************")
+#                print("Brok type: %s" % brok.type)
+#                pprint(data)
+#                print("*************************************")
+
         collection = getattr(self.db, "%ss" % object_type)
         collection.update(
             {"_id": object_name},
@@ -489,7 +542,7 @@ class DataManager(object):
         :rtype: str
         :return: The attribute name to use in mongo query
         """
-        mapping = table_class_map[table][attribute]
+        mapping = self.mapping[table][attribute]
         # Special case, if mapping is {}, no filtering is supported on this
         # attribute
         if "filters" in mapping and mapping["filters"] == {} and raise_error:
@@ -505,7 +558,7 @@ class DataManager(object):
         :rtype: type
         :return: The attribute type
         """
-        return table_class_map[table][attribute].get("datatype")
+        return self.mapping[table][attribute].get("datatype")
 
     def add_filter_eq(self, stack, table, attribute, reference, ignore_type=False):
         """
@@ -1228,7 +1281,7 @@ class DataManager(object):
         :rtype: str
         :return: The attribute name to use in mongo query
         """
-        mapping = table_class_map[table][column]
+        mapping = self.mapping[table][column]
         projection = mapping.get(
             "projection",
             self.get_column_attribute(table, column, False)
@@ -1258,7 +1311,7 @@ class DataManager(object):
             [(p, 1) for p in projection]
         )
 
-    def get_mongo_lookup_hosts(self, pipeline, projection):
+    def get_mongo_expand_hosts(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1282,7 +1335,7 @@ class DataManager(object):
         else:
             return []
 
-    def get_mongo_lookup_services(self, pipeline, projection):
+    def get_mongo_expand_services(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1307,7 +1360,7 @@ class DataManager(object):
         else:
             return []
 
-    def get_mongo_lookup_hostgroups(self, pipeline, projection):
+    def get_mongo_expand_hostgroups(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1338,7 +1391,7 @@ class DataManager(object):
             })
         return lookup
 
-    def get_mongo_lookup_servicegroups(self, pipeline, projection):
+    def get_mongo_expand_servicegroups(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1369,7 +1422,7 @@ class DataManager(object):
             })
         return lookup
 
-    def get_mongo_lookup_hostsbygroup(self, pipeline, projection):
+    def get_mongo_expand_hostsbygroup(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1379,7 +1432,9 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        lookup = []
+        lookup = [
+            {"$unwind": "$hostgroups"}
+        ]
         if not projection or any([p.startswith("services.") for p in projection]):
             lookup.extend([
                 {
@@ -1423,7 +1478,7 @@ class DataManager(object):
             })
         return lookup
 
-    def get_mongo_lookup_servicesbygroup(self, pipeline, projection):
+    def get_mongo_expand_servicesbygroup(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1433,7 +1488,9 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        lookup = []
+        lookup = [
+            {"$unwind": "$servicegroups"}
+        ]
         if not projection or any([p.startswith("host.") for p in projection]):
             lookup.extend([
                 {
@@ -1478,7 +1535,7 @@ class DataManager(object):
             })
         return lookup
 
-    def get_mongo_lookup_servicesbyhostgroup(self, pipeline, projection):
+    def get_mongo_expand_servicesbyhostgroup(self, pipeline, projection):
         """
         Adds cross collections $lookup stage to the pipeline if columns
         require access to child objects attributes.
@@ -1488,7 +1545,9 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        lookup = []
+        lookup = [
+            {"$unwind": "$hostgroups"}
+        ]
         if not projection or any([p.startswith("host.") for p in projection]):
             lookup.extend([
                 {
@@ -1533,6 +1592,80 @@ class DataManager(object):
             })
         return lookup
 
+    def get_mongo_expand_downtimes(self, pipeline, projection):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projection: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projection or any([p.startswith("host.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hosts",
+                        "localField": "id",
+                        "foreignField": "downtimes",
+                        "as": "host",
+                    }
+                },
+                {"$unwind": "$host"}
+            ])
+        if not projection or any([p.startswith("service.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "services",
+                        "localField": "id",
+                        "foreignField": "downtimes",
+                        "as": "service",
+                    }
+                },
+                {"$unwind": "$service"}
+            ])
+        return lookup
+
+    def get_mongo_expand_comments(self, pipeline, projection):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projection: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projection or any([p.startswith("host.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hosts",
+                        "localField": "id",
+                        "foreignField": "comments",
+                        "as": "host",
+                    }
+                },
+                {"$unwind": "$host"}
+            ])
+        if not projection or any([p.startswith("service.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "services",
+                        "localField": "id",
+                        "foreignField": "comments",
+                        "as": "service",
+                    }
+                },
+                {"$unwind": "$service"}
+            ])
+        return lookup
+
     def get_filter_query(self, table, stack, columns=None, limit=None, sort=None, query_format=None):
         """
         Generates the final filter query from the list of queries in
@@ -1563,34 +1696,32 @@ class DataManager(object):
             projection[groupby] = 1
 
         # Check if another collection lookup is necessary
-        get_lookup_fct_name = "get_mongo_lookup_%s" % table
-        get_lookup_fct = getattr(self, get_lookup_fct_name, None)
+        get_expand_fct_name = "get_mongo_expand_%s" % table
+        get_expand_fct = getattr(self, get_expand_fct_name, None)
 
-        if get_lookup_fct:
-            lookup = get_lookup_fct(table, projection)
+        if get_expand_fct:
+            lookup = get_expand_fct(table, projection)
         else:
             lookup = []
 
         # If another collection $lookup is necessary, use an aggregation
         # rather than a search
-        if lookup or groupby or query_format == "aggregation":
+        if lookup or query_format == "aggregation":
             pipeline = [
-                {"$match": query}
+                #{"$project": projection}
             ]
-            if limit:
-                pipeline.append({"$limit": limit})
-            if groupby is not None:
-                # We do a second match as the $unwind may have expanded
-                # documents that we do not want
-                pipeline.extend([
-                    {"$unwind": "$%s" % groupby},
-                    {"$match": query}
-                ])
             pipeline.extend(lookup)
+            pipeline.append(
+                {"$match": query}
+            )
             if projection and query_format != "aggregation":
                 pipeline.append({
                     "$project": projection
                 })
+            if limit is not None:
+                pipeline.append(
+                    {"$limit": limit}
+                )
             if sort is not None:
                 pipeline.append(
                     {"$sort": {sort: 1}}
@@ -1659,7 +1790,7 @@ class DataManager(object):
         :rtype: list
         :return: The filterred columns
         """
-        mapping = table_class_map[table]
+        mapping = self.mapping[table]
         if columns is None:
             columns = mapping.keys()
         else:

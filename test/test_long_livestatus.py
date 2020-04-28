@@ -30,11 +30,14 @@ import os
 import sys
 import time
 import random
+import logging
 
 from shinken_test import unittest
 
 from shinken_modules import TestConfig
 from shinken.comment import Comment
+from shinken.log import logger
+logger.setLevel(logging.DEBUG)
 
 from mock_livestatus import mock_livestatus_handle_request
 from livestatus.mongo_mapping import table_class_map

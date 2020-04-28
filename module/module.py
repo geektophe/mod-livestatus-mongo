@@ -66,7 +66,6 @@ from shinken.log import logger
 from shinken.modulesmanager import ModulesManager
 from shinken.objects.module import Module
 from shinken.daemon import Daemon
-from shinken.misc.datamanager import datamgr
 from shinken.daterange import Timerange, Daterange
 
 # Local import
@@ -74,7 +73,6 @@ from .livestatus_obj import LiveStatus
 from .livestatus_regenerator import LiveStatusRegenerator
 from .livestatus_query_cache import LiveStatusQueryCache
 from .livestatus_client_thread import LiveStatusClientThread
-from .livestatus_mongo_datamanager import datamgr as mongo_datamgr
 
 # actually "sub-"imported by logstore_sqlite or some others
 # until they are corrected to import from the good place we need them here:
@@ -84,7 +82,6 @@ from .log_line import (
     Logline,
     LOGCLASS_INVALID
 )
-import pymongo
 
 #############################################################################
 
@@ -141,6 +138,8 @@ class LiveStatus_broker(BaseModule, Daemon):
             self.group_authorization_strict = True
         else:
             self.group_authorization_strict = False
+        self.backend = getattr(modconf, "backend", "mongo")
+        self.backend_uri = getattr(modconf, "backend_uri", "mongodb://localhost")
 
         #  This is an "artificial" module which is used when an old-style
         #  shinken-specific.cfg without a separate logstore-module is found.
@@ -166,7 +165,6 @@ class LiveStatus_broker(BaseModule, Daemon):
         self.db = None
         self.listeners = []
         self._listening_thread = threading.Thread(target=self._listening_thread_run)
-        self.mongo_datamgr = mongo_datamgr
 
     def add_compatibility_sqlite_module(self):
         if len([m for m in self.modules_manager.instances if m.properties['type'].startswith('logstore_')]) == 0:
@@ -189,7 +187,23 @@ class LiveStatus_broker(BaseModule, Daemon):
         m.output_macros = ['HOSTOUTPUT', 'HOSTPERFDATA', 'HOSTACKAUTHOR',
                            'HOSTACKCOMMENT', 'SERVICEOUTPUT', 'SERVICEPERFDATA',
                            'SERVICEACKAUTHOR', 'SERVICEACKCOMMENT']
-        self.rg.load_external_queue(self.from_q)
+        if self.backend == "mongo":
+            from .livestatus_mongo_datamanager import datamgr
+            import pymongo
+            self.datamgr = datamgr
+            self.mongo_client = pymongo.MongoClient(self.backend_uri)
+            self.datamgr.load(self.mongo_client.livestatus)
+        elif self.backend ==  "memory":
+            from shinken.misc.datamanager import datamgr
+            self.datamgr = datamgr
+            datamgr.load(self.rg)
+            self.query_cache = LiveStatusQueryCache()
+            if not self.use_query_cache:
+                self.query_cache.disable()
+            self.rg.register_cache(self.query_cache)
+            self.rg.load_external_queue(self.from_q)
+        else:
+            raise Exception("Unknow backend")
 
     # This is called only when we are in a scheduler
     # and just before we are started. So we can gain time, and
@@ -244,15 +258,6 @@ class LiveStatus_broker(BaseModule, Daemon):
             logger.debug("[Livestatus Broker] %s" % s)
         del self.debug_output
         self.add_compatibility_sqlite_module()
-        self.datamgr = datamgr
-        self.mongo_client = pymongo.MongoClient("localhost", 27017)
-        self.mongo_datamgr.load(self.mongo_client.livestatus)
-        datamgr.load(self.rg)
-        self.query_cache = LiveStatusQueryCache()
-        if not self.use_query_cache:
-            self.query_cache.disable()
-        self.rg.register_cache(self.query_cache)
-
         try:
             self.do_main()
         except Exception, exp:
@@ -301,21 +306,13 @@ class LiveStatus_broker(BaseModule, Daemon):
     def load_plugins(self):
         pass
 
-    def normalize(self, obj):
-        if hasattr(obj, "get_name"):
-            return obj.get_name()
-        elif isinstance(obj, list):
-            return [self.normalize(o) for o in obj]
-        elif isinstance(obj, dict):
-            return dict([(k, self.normalize(v)) for k, v in obj.items()])
-        else:
-            return obj
-
     def manage_brok(self, brok):
         """We use this method mostly for the unit tests"""
         brok.prepare()
-        #self.rg.manage_brok(brok)
-        self.mongo_datamgr.manage_brok(brok)
+        if self.backend == "memory":
+            self.rg.manage_brok(brok)
+        else:
+            self.datamgr.manage_brok(brok)
 
         for mod in self.modules_manager.get_internal_instances():
             try:

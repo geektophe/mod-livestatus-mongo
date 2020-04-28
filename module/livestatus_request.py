@@ -32,11 +32,10 @@ class LiveStatusRequest:
 
     """A class describing a livestatus request."""
 
-    def __init__(self, data, datamgr, mongo_datamgr, db, pnp_path, return_queue, counters):
+    def __init__(self, data, datamgr, db, pnp_path, return_queue, counters):
         self.data = data
         # Runtime data form the global LiveStatus object
         self.datamgr = datamgr
-        self.mongo_datamgr = mongo_datamgr
         self.db = db
         self.pnp_path = pnp_path
         self.return_queue = return_queue
@@ -96,7 +95,7 @@ class LiveStatusRequest:
             self.queries.append(query)
         if len(query_cmds) > 0:
             query = LiveStatusQuery(
-                self.mongo_datamgr,
+                self.datamgr,
                 self.db,
                 self.pnp_path,
                 self.return_queue,
