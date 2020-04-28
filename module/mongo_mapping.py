@@ -92,7 +92,6 @@ def state_count(item, table, state_type_id=None, state_id=None):
     :rtype: int
     :return: The number of matching services
     """
-    table = "__%s__" % table
     try:
         if state_type_id is not None and state_id is not None:
             if isinstance(state_id, int):
@@ -139,7 +138,6 @@ def state_worst(item, table, state_type_id=None):
     :rtype: int
     :return: The worst service state id
     """
-    table = "__%s__" % table
     try:
         if state_type_id is not None:
             states = [
@@ -150,9 +148,9 @@ def state_worst(item, table, state_type_id=None):
             states = [
                 s["state_id"] for s in item[table]
             ]
-        if table == "__services__" and 2 in states:
+        if table == "services" and 2 in states:
             return 2
-        elif table == "__hosts__" and 1 in states:
+        elif table == "hosts" and 1 in states:
             return 1
         elif not states:
             return 0
@@ -173,7 +171,7 @@ def linked_attr(item, table, attr, default=""):
     :param str attr: The attribute name to read
     :param mixed defaut: The default value
     """
-    obj = item.get("__%s__" % table)
+    obj = item.get(table)
     if obj:
         return obj.get(attr, default)
     else:
@@ -653,7 +651,7 @@ livestatus_attribute_map = {
             'description': 'A list of all services of the host',
             'function': lambda item: item.get("services", []),
             'datatype': list,
-            'projection': ['__services__.service_description'],
+            'projection': ['services.service_description'],
             'filters': {},
         },
         'services_with_info': {
@@ -661,9 +659,9 @@ livestatus_attribute_map = {
             'function': lambda item: [],  #FIXME
             'datatype': list,
             'projection': [
-                '__services__.service_description',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.service_description',
+                'services.state_id',
+                'services.state_type_id'
             ],
             # Dummy Service|0|1|Please remove this service later,Deppen Service|2|1|depp
             'filters': {},
@@ -673,9 +671,9 @@ livestatus_attribute_map = {
             'function': lambda item: [], #FIXME
             'datatype': list,
             'projection': [
-                '__services__.service_description',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.service_description',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -708,7 +706,7 @@ livestatus_attribute_map = {
             'description': 'The total number of services of the host',
             'function': lambda item: len(item.get("services", [])),
             'datatype': int,
-            'projection': ['__services__.service_description'],
+            'projection': ['services.service_description'],
             'filters': {},
         },
         'x_3d': {
@@ -733,7 +731,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "passive_checks_enabled", True),
             'datatype': bool,
             'projection': [
-                '__host__.passive_checks_enabled',
+                'host.passive_checks_enabled',
             ],
             'filters': {},
         },
@@ -742,7 +740,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "problem_has_been_acknowledged", False),
             'datatype': bool,
             'projection': [
-                '__host__.problem_has_been_acknowledged',
+                'host.problem_has_been_acknowledged',
             ],
             'filters': {},
         },
@@ -751,7 +749,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "acknowledgement_type", 0),
             'datatype': int,
             'projection': [
-                '__host__.acknowledgement_type',
+                'host.acknowledgement_type',
             ],
             'filters': {},
         },
@@ -759,7 +757,7 @@ livestatus_attribute_map = {
             'description': 'An optional URL to custom actions or information about this host',
             'function': lambda item: linked_attr(item, "host", "action_url", ""),
             'projection': [
-                '__host__.action_url',
+                'host.action_url',
             ],
             'filters': {},
         },
@@ -774,14 +772,14 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "active_checks_enabled", True),
             'datatype': bool,
             'projection': [
-                '__host__.active_checks_enabled',
+                'host.active_checks_enabled',
             ],
         },
         'host_address': {
             'description': 'IP address',
             'function': lambda item: linked_attr(item, "host", "address"),
             'projection': [
-                '__host__.address',
+                'host.address',
             ],
             'filters': {},
         },
@@ -789,7 +787,7 @@ livestatus_attribute_map = {
             'description': 'An alias name for the host',
             'function': lambda item: linked_attr(item, "host", "alias"),
             'projection': [
-                '__host__.alias',
+                'host.alias',
             ],
             'filters': {},
         },
@@ -797,7 +795,7 @@ livestatus_attribute_map = {
             'description': 'Nagios command used for active checks',
             'function': lambda item: linked_attr(item, "host", "check_command"),
             'projection': [
-                '__host__.check_command',
+                'host.check_command',
             ],
             'filters': {},
         },
@@ -806,7 +804,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "check_flapping_recovery_notification", 0),
             'datatype': int,
             'projection': [
-                '__host__.check_flapping_recovery_notification',
+                'host.check_flapping_recovery_notification',
             ],
             'filters': {},
         },
@@ -815,7 +813,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "check_freshness", False),
             'datatype': bool,
             'projection': [
-                '__host__.check_freshness',
+                'host.check_freshness',
             ],
             'filters': {},
         },
@@ -824,7 +822,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "check_interval", 0),
             'datatype': float,
             'projection': [
-                '__host__.check_interval',
+                'host.check_interval',
             ],
             'filters': {},
         },
@@ -832,7 +830,7 @@ livestatus_attribute_map = {
             'description': 'The current check option, forced, normal, freshness... (0-2)',
             'function': lambda item: linked_attr(item, "host", "check_options"),
             'projection': [
-                '__host__.check_options',
+                'host.check_options',
             ],
             'filters': {},
         },
@@ -840,7 +838,7 @@ livestatus_attribute_map = {
             'description': 'Time period in which this host will be checked. If empty then the host will always be checked.',
             'function': lambda item: linked_attr(item, "host", "check_period"),
             'projection': [
-                '__host__.period',
+                'host.period',
             ],
             'filters': {},
         },
@@ -856,7 +854,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "active_checks_enabled", True),
             'datatype': bool,
             'projection': [
-                '__host__.active_checks_enabled',
+                'host.active_checks_enabled',
             ],
             'filters': {},
         },
@@ -864,7 +862,7 @@ livestatus_attribute_map = {
             'description': 'A list of all direct childs of the host',
             'function': lambda item: linked_attr(item, "host", "childs", []),
             'datatype': list,
-            'projection': ['__host__.childs'],
+            'projection': ['host.childs'],
             'filters': {},
         },
         'host_comments': {
@@ -872,7 +870,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "comments", []),
             'datatype': list,
             'projection': [
-                '__host__.comments',
+                'host.comments',
             ],
             'filters': {},
         },
@@ -888,7 +886,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "contacts", []),
             'datatype': list,
             'projection': [
-                '__host__.contacts',
+                'host.contacts',
             ],
             'filters': {},
         },
@@ -897,7 +895,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "contact_groups", []),
             'datatype': list,
             'projection': [
-                '__host__.contact_groups',
+                'host.contact_groups',
             ],
             'filters': {},
         },
@@ -906,7 +904,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "attempt", 0),
             'datatype': int,
             'projection': [
-                '__host__.attempt',
+                'host.attempt',
             ],
             'filters': {},
         },
@@ -915,7 +913,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "current_notification_number", 0),
             'datatype': int,
             'projection': [
-                '__host__.current_notification_number',
+                'host.current_notification_number',
             ],
             'filters': {},
         },
@@ -944,7 +942,7 @@ livestatus_attribute_map = {
             'description': 'Optional display name of the host - not used by Nagios\' web interface',
             'function': lambda item: linked_attr(item, "host", "display_name"),
             'projection': [
-                '__host__.display_name',
+                'host.display_name',
             ],
             'filters': {},
         },
@@ -967,7 +965,7 @@ livestatus_attribute_map = {
             'description': 'Nagios command used as event handler of this host',
             'function': lambda item: linked_attr(item, "host", "event_handler"),
             'projection': [
-                '__host__.event_handler',
+                'host.event_handler',
             ],
             'filters': {},
         },
@@ -976,7 +974,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "event_handler_enabled", True),
             'datatype': bool,
             'projection': [
-                '__host__.event_handler_enabled',
+                'host.event_handler_enabled',
             ],
             'filters': {},
         },
@@ -985,7 +983,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "execution_time", 0),
             'datatype': float,
             'projection': [
-                '__host__.execution_time',
+                'host.execution_time',
             ],
             'filters': {},
         },
@@ -1000,7 +998,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "first_notification_delay", 0),
             'datatype': float,
             'projection': [
-                '__host__.first_notification_delay',
+                'host.first_notification_delay',
             ],
         },
         'host_flap_detection_enabled': {
@@ -1008,7 +1006,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "flap_detection_enabled", True),
             'datatype': bool,
             'projection': [
-                '__host__.flap_detection_enabled',
+                'host.flap_detection_enabled',
             ],
             'filters': {},
         },
@@ -1017,7 +1015,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "hostgroups", []),
             'datatype': list,
             'projection': [
-                '__host__.hostgroups',
+                'host.hostgroups',
             ],
             'filters': {},
         },
@@ -1026,7 +1024,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "hard_state", 0),
             'datatype': int,
             'projection': [
-                '__host__.hard_state',
+                'host.hard_state',
             ],
             'filters': {},
         },
@@ -1035,7 +1033,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "has_been_checked", True),
             'datatype': bool,
             'projection': [
-                '__host__.has_been_checked',
+                'host.has_been_checked',
             ],
             'filters': {},
         },
@@ -1044,7 +1042,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "high_flap_threshold", 0),
             'datatype': float,
             'projection': [
-                '__host__.high_flap_threshold',
+                'host.high_flap_threshold',
             ],
             'filters': {},
         },
@@ -1052,7 +1050,7 @@ livestatus_attribute_map = {
             'description': 'The name of an image file to be used in the web pages',
             'function': lambda item: linked_attr(item, "host", "icon_image"),
             'projection': [
-                '__host__.icon_image',
+                'host.icon_image',
             ],
             'filters': {},
         },
@@ -1060,7 +1058,7 @@ livestatus_attribute_map = {
             'description': 'Alternative text for the icon_image',
             'function': lambda item: linked_attr(item, "host", "icon_image_alt"),
             'projection': [
-                '__host__.icon_image_alt',
+                'host.icon_image_alt',
             ],
             'filters': {},
         },
@@ -1089,7 +1087,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "initial_state"),
             'datatype': int,
             'projection': [
-                '__host__.initial_state',
+                'host.initial_state',
             ],
             'filters': {},
         },
@@ -1104,7 +1102,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "is_flapping", False),
             'datatype': bool,
             'projection': [
-                '__host__.is_flapping',
+                'host.is_flapping',
             ],
             'filters': {},
         },
@@ -1113,7 +1111,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_chk", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_chk',
+                'host.last_chk',
             ],
             'filters': {},
         },
@@ -1122,7 +1120,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_hard_state_id", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_hard_state_id',
+                'host.last_hard_state_id',
             ],
             'filters': {},
         },
@@ -1131,7 +1129,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_hard_state_change", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_hard_state_change',
+                'host.last_hard_state_change',
             ],
             'filters': {},
         },
@@ -1140,7 +1138,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_notification", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_notification',
+                'host.last_notification',
             ],
             'filters': {},
         },
@@ -1148,7 +1146,7 @@ livestatus_attribute_map = {
             'description': 'State before last state change',
             'function': lambda item: linked_attr(item, "host", "last_state"),
             'projection': [
-                '__host__.last_state',
+                'host.last_state',
             ],
             'filters': {},
         },
@@ -1157,7 +1155,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_state_change", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_state_change',
+                'host.last_state_change',
             ],
             'filters': {},
         },
@@ -1166,7 +1164,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_time_down", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_time_down',
+                'host.last_time_down',
             ],
             'filters': {},
         },
@@ -1175,7 +1173,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_time_unreachable", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_time_unreachable',
+                'host.last_time_unreachable',
             ],
             'filters': {},
         },
@@ -1184,7 +1182,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "last_time_up", 0),
             'datatype': int,
             'projection': [
-                '__host__.last_time_up',
+                'host.last_time_up',
             ],
             'filters': {},
         },
@@ -1193,7 +1191,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "latency", 0),
             'datatype': float,
             'projection': [
-                '__host__.latency',
+                'host.latency',
             ],
             'filters': {},
         },
@@ -1201,7 +1199,7 @@ livestatus_attribute_map = {
             'description': 'Complete output from check plugin',
             'function': lambda item: linked_attr(item, "host", "long_output"),
             'projection': [
-                '__host__.long_output',
+                'host.long_output',
             ],
             'filters': {},
         },
@@ -1210,7 +1208,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "low_flap_threshold", 0),
             'datatype': float,
             'projection': [
-                '__host__.low_flap_threshold',
+                'host.low_flap_threshold',
             ],
             'filters': {},
         },
@@ -1219,7 +1217,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "max_checks_attempts", 0),
             'datatype': int,
             'projection': [
-                '__host__.max_checks_attempts',
+                'host.max_checks_attempts',
             ],
             'filters': {},
         },
@@ -1228,7 +1226,7 @@ livestatus_attribute_map = {
             'function': lambda item: 0, #FIXME
             'datatype': int,
             'projection': [
-                '__host__.modified_attributes',
+                'host.modified_attributes',
             ],
             'filters': {},
         },
@@ -1246,7 +1244,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "next_chk", 0),
             'datatype': int,
             'projection': [
-                '__host__.next_chk',
+                'host.next_chk',
             ],
             'filters': {},
         },
@@ -1260,7 +1258,7 @@ livestatus_attribute_map = {
             'description': 'Optional notes about the service',
             'function': lambda item: linked_attr(item, "host", "notes"),
             'projection': [
-                '__host__.notes',
+                'host.notes',
             ],
             'filters': {},
         },
@@ -1274,7 +1272,7 @@ livestatus_attribute_map = {
             'description': 'An optional URL with further information about the host',
             'function': lambda item: linked_attr(item, "host", "notes_url"),
             'projection': [
-                '__host__.notes_url',
+                'host.notes_url',
             ],
             'filters': {},
         },
@@ -1289,7 +1287,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "notification_interval", 0),
             'datatype': float,
             'projection': [
-                '__host__.notification_interval',
+                'host.notification_interval',
             ],
             'filters': {},
         },
@@ -1297,7 +1295,7 @@ livestatus_attribute_map = {
             'description': 'Time period in which problems of this host will be notified. If empty then notification will be always',
             'function': lambda item: linked_attr(item, "host", "notification_period"),
             'projection': [
-                '__host__.notification_period',
+                'host.notification_period',
             ],
             'filters': {},
         },
@@ -1306,7 +1304,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "notifications_enabled", True),
             'datatype': bool,
             'projection': [
-                '__host__.notifications_enabled',
+                'host.notifications_enabled',
             ],
             'filters': {},
         },
@@ -1315,7 +1313,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "no_more_notifications", True),
             'datatype': bool,
             'projection': [
-                '__host__.no_more_notifications',
+                'host.no_more_notifications',
             ],
             'filters': {},
         },
@@ -1401,7 +1399,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "alias", []),
             'datatype':list,
             'projection': [
-                '__host__.parents',
+                'host.parents',
             ],
             'filters': {},
         },
@@ -1410,7 +1408,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "pending_flex_downtimes", 0),
             'datatype': int,
             'projection': [
-                '__host__.pending_flex_downtimes',
+                'host.pending_flex_downtimes',
             ],
             'filters': {},
         },
@@ -1419,7 +1417,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "percent_state_change", 0),
             'datatype': float,
             'projection': [
-                '__host__.percent_state_change',
+                'host.percent_state_change',
             ],
             'filters': {},
         },
@@ -1427,7 +1425,7 @@ livestatus_attribute_map = {
             'description': 'Optional performance data of the last host check',
             'function': lambda item: linked_attr(item, "host", "perf_data"),
             'projection': [
-                '__host__.perf_data',
+                'host.perf_data',
             ],
             'filters': {},
         },
@@ -1435,7 +1433,7 @@ livestatus_attribute_map = {
             'description': 'Output of the last host check',
             'function': lambda item: linked_attr(item, "host", "output"),
             'projection': [
-                '__host__.output',
+                'host.output',
             ],
             'filters': {},
         },
@@ -1451,7 +1449,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "process_performances_data", True),
             'datatype': bool,
             'projection': [
-                '__host__.process_performances_data',
+                'host.process_performances_data',
             ],
             'filters': {},
         },
@@ -1460,7 +1458,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "retry_interval", 0),
             'datatype': float,
             'projection': [
-                '__host__.retry_interval',
+                'host.retry_interval',
             ],
             'filters': {},
         },
@@ -1469,7 +1467,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "scheduled_downtime_depth", 0),
             'datatype': int,
             'projection': [
-                '__host__.scheduled_downtime_depth',
+                'host.scheduled_downtime_depth',
             ],
             'filters': {},
         },
@@ -1499,7 +1497,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "state_id", 0),
             'datatype': int,
             'projection': [
-                '__host__.state_id',
+                'host.state_id',
             ],
             'filters': {},
         },
@@ -1508,7 +1506,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "state_type_id", 0),
             'datatype': int,
             'projection': [
-                '__host__.state_type_id',
+                'host.state_type_id',
             ],
             'filters': {},
         },
@@ -1516,7 +1514,7 @@ livestatus_attribute_map = {
             'description': 'The name of in image file for the status map',
             'function': lambda item: linked_attr(item, "host", "statusmap_image"),
             'projection': [
-                '__host__.statusmap_image',
+                'host.statusmap_image',
             ],
             'filters': {},
         },
@@ -1525,7 +1523,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "tags", []),
             'datatype': list,
             'projection': [
-                '__host__.tags',
+                'host.tags',
             ],
             'filters': {},
         },
@@ -1555,7 +1553,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "x_3d"),
             'datatype': float,
             'projection': [
-                '__host__.x_3d',
+                'host.x_3d',
             ],
             'filters': {},
         },
@@ -1564,7 +1562,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "y_3d"),
             'datatype': float,
             'projection': [
-                '__host__.y_3d',
+                'host.y_3d',
             ],
             'filters': {},
         },
@@ -1573,7 +1571,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "host", "z_3d"),
             'datatype': float,
             'projection': [
-                '__host__.z_3d',
+                'host.z_3d',
             ],
             'filters': {},
         },
@@ -2023,7 +2021,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "passive_checks_enabled", True),
             'datatype': bool,
             'projection': [
-                '__service__.passive_checks_enabled',
+                'service.passive_checks_enabled',
             ],
             'filters': {},
         },
@@ -2032,7 +2030,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "problem_has_been_acknowledged", False),
             'datatype': bool,
             'projection': [
-                '__service__.problem_has_been_acknowledged',
+                'service.problem_has_been_acknowledged',
             ],
             'filters': {},
         },
@@ -2041,7 +2039,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "acknowledgement_type", 0),
             'datatype': int,
             'projection': [
-                '__service__.acknowledgement_type',
+                'service.acknowledgement_type',
             ],
             'filters': {},
         },
@@ -2049,7 +2047,7 @@ livestatus_attribute_map = {
             'description': 'An optional URL to custom actions or information about this service',
             'function': lambda item: linked_attr(item, "service", "action_url"),
             'projection': [
-                '__service__.action_url',
+                'service.action_url',
             ],
             'filters': {},
         },
@@ -2064,7 +2062,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "active_checks_enabled", True),
             'type': bool,
             'projection': [
-                '__service__.active_checks_enabled',
+                'service.active_checks_enabled',
             ],
             'filters': {},
         },
@@ -2072,7 +2070,7 @@ livestatus_attribute_map = {
             'description': 'Nagios command used for active checks',
             'function': lambda item: linked_attr(item, "service", "check_command"),
             'projection': [
-                '__service__.check_command',
+                'service.check_command',
             ],
             'filters': {},
         },
@@ -2081,7 +2079,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "check_interval", 0),
             'datatype': float,
             'projection': [
-                '__service__.check_interval',
+                'service.check_interval',
             ],
             'filters': {},
         },
@@ -2090,7 +2088,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "check_options"),
             'type': list,
             'projection': [
-                '__service__.check_options',
+                'service.check_options',
             ],
             'filters': {},
         },
@@ -2098,7 +2096,7 @@ livestatus_attribute_map = {
             'description': 'Time period in which this service will be checked. If empty then the service will always be checked.',
             'function': lambda item: linked_attr(item, "service", "check_period"),
             'projection': [
-                '__service__.check_period',
+                'service.check_period',
             ],
             'filters': {},
         },
@@ -2114,7 +2112,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "checks_enabled", True),
             'datatype': bool,
             'projection': [
-                '__service__.checks_enabled',
+                'service.checks_enabled',
             ],
             'filters': {},
         },
@@ -2123,7 +2121,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "comments", []),
             'datatype': list,
             'projection': [
-                '__service__.comments',
+                'service.comments',
             ],
             'filters': {},
         },
@@ -2139,7 +2137,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "contacts", []),
             'datatype': list,
             'projection': [
-                '__service__.contacts',
+                'service.contacts',
             ],
             'filters': {},
         },
@@ -2148,7 +2146,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "contact_groups", []),
             'datatype': list,
             'projection': [
-                '__service__.contact_groups',
+                'service.contact_groups',
             ],
             'filters': {},
         },
@@ -2157,7 +2155,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "attempt", 0),
             'datatype': int,
             'projection': [
-                '__service__.attempt',
+                'service.attempt',
             ],
             'filters': {},
         },
@@ -2166,7 +2164,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "current_notification_number", 0),
             'datatype': int,
             'projection': [
-                '__service__.current_notification_number',
+                'service.current_notification_number',
             ],
             'filters': {},
         },
@@ -2195,7 +2193,7 @@ livestatus_attribute_map = {
             'description': 'Optional display name of the service - not used by Nagios\' web interface',
             'function': lambda item: linked_attr(item, "service", "display_name"),
             'projection': [
-                '__service__.display_name',
+                'service.display_name',
             ],
             'filters': {},
         },
@@ -2204,7 +2202,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "downtimes", []),
             'datatype': list,
             'projection': [
-                '__service__.display_name',
+                'service.display_name',
             ],
             'filters': {},
         },
@@ -2220,7 +2218,7 @@ livestatus_attribute_map = {
             'description': 'Nagios command used as event handler of this service',
             'function': lambda item: linked_attr(item, "service", "event_handler"),
             'projection': [
-                '__service__.event_handler',
+                'service.event_handler',
             ],
             'filters': {},
         },
@@ -2229,7 +2227,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "event_handler_enabled", True),
             'datatype': bool,
             'projection': [
-                '__service__.event_handler_enabled',
+                'service.event_handler_enabled',
             ],
             'filters': {},
         },
@@ -2238,7 +2236,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "execution_time", 0),
             'datatype': float,
             'projection': [
-                '__service__.execution_time',
+                'service.execution_time',
             ],
             'filters': {},
         },
@@ -2247,7 +2245,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "first_notification_delay", 0),
             'datatype': float,
             'projection': [
-                '__service__.first_notification_delay',
+                'service.first_notification_delay',
             ],
             'filters': {},
         },
@@ -2256,7 +2254,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "flap_detection_enabled", True),
             'datatype': bool,
             'projection': [
-                '__service__.flap_detection_enabled',
+                'service.flap_detection_enabled',
             ],
             'filters': {},
         },
@@ -2265,7 +2263,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "servicegroups", []),
             'datatype': list,
             'projection': [
-                '__service__.servicegroups',
+                'service.servicegroups',
             ],
             'filters': {},
         },
@@ -2274,7 +2272,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "has_been_checked", False),
             'datatype': bool,
             'projection': [
-                '__service__.has_been_checked',
+                'service.has_been_checked',
             ],
             'filters': {},
         },
@@ -2283,7 +2281,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "high_flap_threshold", 0),
             'datatype': float,
             'projection': [
-                '__service__.high_flap_threshold',
+                'service.high_flap_threshold',
             ],
             'filters': {},
         },
@@ -2291,7 +2289,7 @@ livestatus_attribute_map = {
             'description': 'The name of an image file to be used in the web pages',
             'function': lambda item: linked_attr(item, "service", "icon_image"),
             'projection': [
-                '__service__.icon_image',
+                'service.icon_image',
             ],
             'filters': {},
         },
@@ -2299,7 +2297,7 @@ livestatus_attribute_map = {
             'description': 'Alternative text for the icon_image',
             'function': lambda item: linked_attr(item, "service", "icon_image_alt"),
             'projection': [
-                '__service__.icon_image_alt',
+                'service.icon_image_alt',
             ],
             'filters': {},
         },
@@ -2327,7 +2325,7 @@ livestatus_attribute_map = {
             'description': 'Initial service state',
             'function': lambda item: linked_attr(item, "service", "initial_state"),
             'projection': [
-                '__service__.initial_state',
+                'service.initial_state',
             ],
             'filters': {},
         },
@@ -2343,7 +2341,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "is_flapping", False),
             'datatype': bool,
             'projection': [
-                '__service__.is_flapping',
+                'service.is_flapping',
             ],
             'filters': {},
         },
@@ -2352,7 +2350,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_chk", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_chk',
+                'service.last_chk',
             ],
             'filters': {},
         },
@@ -2361,7 +2359,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_hard_state_id", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_hard_state_id',
+                'service.last_hard_state_id',
             ],
             'filters': {},
         },
@@ -2370,7 +2368,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_hard_state_change", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_hard_state_change',
+                'service.last_hard_state_change',
             ],
             'filters': {},
         },
@@ -2379,7 +2377,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_notification", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_notification',
+                'service.last_notification',
             ],
             'filters': {},
         },
@@ -2387,7 +2385,7 @@ livestatus_attribute_map = {
             'description': 'State before last state change',
             'function': lambda item: linked_attr(item, "service", "last_state"),
             'projection': [
-                '__service__.last_state',
+                'service.last_state',
             ],
             'filters': {},
         },
@@ -2396,7 +2394,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_state_change", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_state_change',
+                'service.last_state_change',
             ],
             'filters': {},
         },
@@ -2405,7 +2403,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_time_down", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_time_down',
+                'service.last_time_down',
             ],
             'filters': {},
         },
@@ -2414,7 +2412,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_time_unreachable", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_time_unreachable',
+                'service.last_time_unreachable',
             ],
             'filters': {},
         },
@@ -2423,7 +2421,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "last_time_up", 0),
             'datatype': int,
             'projection': [
-                '__service__.last_time_up',
+                'service.last_time_up',
             ],
             'filters': {},
         },
@@ -2432,7 +2430,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "latency", 0),
             'datatype': float,
             'projection': [
-                '__service__.latency',
+                'service.latency',
             ],
             'filters': {},
         },
@@ -2440,7 +2438,7 @@ livestatus_attribute_map = {
             'description': 'Complete output from check plugin',
             'function': lambda item: linked_attr(item, "service", "long_output"),
             'projection': [
-                '__service__.long_output',
+                'service.long_output',
             ],
             'filters': {},
         },
@@ -2449,7 +2447,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "low_flap_threshold", 0),
             'datatype': float,
             'projection': [
-                '__service__.low_flap_threshold',
+                'service.low_flap_threshold',
             ],
             'filters': {},
         },
@@ -2458,7 +2456,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "max_checks_attempts", 0),
             'datatype': int,
             'projection': [
-                '__service__.max_checks_attempts',
+                'service.max_checks_attempts',
             ],
             'filters': {},
         },
@@ -2467,7 +2465,7 @@ livestatus_attribute_map = {
             'function': lambda item: len(linked_attr(item, "service", "modified_attributes", 0)),
             'datatype': int,
             'projection': [
-                '__service__.modified_attributes',
+                'service.modified_attributes',
             ],
             'filters': {},
         },
@@ -2483,7 +2481,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "next_chk", 0),
             'datatype': int,
             'projection': [
-                '__service__.next_chk',
+                'service.next_chk',
             ],
             'filters': {},
         },
@@ -2492,7 +2490,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "next_notification", 0),
             'datatype': int,
             'projection': [
-                '__service__.next_notifications',
+                'service.next_notifications',
             ],
             'filters': {},
         },
@@ -2500,7 +2498,7 @@ livestatus_attribute_map = {
             'description': 'Optional notes about the service',
             'function': lambda item: linked_attr(item, "service", "notes"),
             'projection': [
-                '__service__.notes',
+                'service.notes',
             ],
             'filters': {},
         },
@@ -2514,7 +2512,7 @@ livestatus_attribute_map = {
             'description': 'An optional URL with further information about the service',
             'function': lambda item: linked_attr(item, "service", "notes_url"),
             'projection': [
-                '__service__.notes_url',
+                'service.notes_url',
             ],
             'filters': {},
         },
@@ -2529,7 +2527,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "notification_interval", 0),
             'datatype': float,
             'projection': [
-                '__service__.notification_interval',
+                'service.notification_interval',
             ],
             'filters': {},
         },
@@ -2537,7 +2535,7 @@ livestatus_attribute_map = {
             'description': 'Time period in which problems of this service will be notified. If empty then notification will be always',
             'function': lambda item: linked_attr(item, "service", "notification_period"),
             'projection': [
-                '__service__.notification_period',
+                'service.notification_period',
             ],
             'filters': {},
         },
@@ -2546,7 +2544,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "notifications_enabled", True),
             'datatype': bool,
             'projection': [
-                '__service__.notifications_enabled',
+                'service.notifications_enabled',
             ],
             'filters': {},
         },
@@ -2555,7 +2553,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "no_more_notifications", True),
             'datatype': bool,
             'projection': [
-                '__service__.no_more_notifications',
+                'service.no_more_notifications',
             ],
             'filters': {},
         },
@@ -2564,7 +2562,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "percent_state_change", 0),
             'datatype': float,
             'projection': [
-                '__service__.percent_state_change',
+                'service.percent_state_change',
             ],
             'filters': {},
         },
@@ -2572,7 +2570,7 @@ livestatus_attribute_map = {
             'description': 'Optional performance data of the last service check',
             'function': lambda item: linked_attr(item, "service", "perf_data"),
             'projection': [
-                '__service__.perf_data',
+                'service.perf_data',
             ],
             'filters': {},
         },
@@ -2580,7 +2578,7 @@ livestatus_attribute_map = {
             'description': 'Output of the last service check',
             'function': lambda item: linked_attr(item, "service", "output"),
             'projection': [
-                '__service__.output',
+                'service.output',
             ],
             'filters': {},
         },
@@ -2596,7 +2594,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "process_performances_data", True),
             'datatype': bool,
             'projection': [
-                '__service__.process_performances_data',
+                'service.process_performances_data',
             ],
             'filters': {},
         },
@@ -2605,7 +2603,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "retry_interval", 0),
             'datatype': float,
             'projection': [
-                '__service__.retry_interval',
+                'service.retry_interval',
             ],
             'filters': {},
         },
@@ -2614,7 +2612,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "scheduled_downtime_depth", 0),
             'datatype': int,
             'projection': [
-                '__service__.scheduled_downtime_depth',
+                'service.scheduled_downtime_depth',
             ],
             'filters': {},
         },
@@ -2623,7 +2621,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "state_id", 0),
             'datatype': int,
             'projection': [
-                '__service__.state_id',
+                'service.state_id',
             ],
             'filters': {},
         },
@@ -2632,7 +2630,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "state_type_id", 0),
             'datatype': int,
             'projection': [
-                '__service__.state_type_id',
+                'service.state_type_id',
             ],
             'filters': {},
         },
@@ -2640,8 +2638,8 @@ livestatus_attribute_map = {
     'ServicesLink': {
         'num_services': {
             'description': 'The total number of services of the host',
-            'function': lambda item: len(item["__services__"]),
-            'projection': ['__services__.service_description'],
+            'function': lambda item: len(item["services"]),
+            'projection': ['services.service_description'],
             'filters': {},
         },
         'num_services_crit': {
@@ -2649,9 +2647,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 0, 2),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2660,9 +2658,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 1, 2),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2671,9 +2669,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 1, 0),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2682,9 +2680,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 1, 3),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2693,9 +2691,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 1, 1),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2704,9 +2702,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 0, 0),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2715,9 +2713,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2726,9 +2724,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 0, 3),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2737,9 +2735,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "services", 0, 1),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2748,9 +2746,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "services", 1),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
         },
@@ -2759,9 +2757,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "services", 0),
             'datatype': int,
             'projection': [
-                '__services__.state',
-                '__services__.state_id',
-                '__services__.state_type_id'
+                'services.state',
+                'services.state_id',
+                'services.state_type_id'
             ],
             'filters': {},
             'datatype': int,
@@ -2770,17 +2768,17 @@ livestatus_attribute_map = {
     'HostsLink': {
         'num_hosts': {
             'description': 'The total number of hosts in the group',
-            'function': lambda item: len(item["__hosts__"]),
-            'projection': ["__hosts__.host_name"],
+            'function': lambda item: len(item["hosts"]),
+            'projection': ["hosts.host_name"],
         },
         'num_hosts_down': {
             'description': 'The number of hosts in the group that are down',
             'function': lambda item: state_count(item, "hosts", 1, 1),
             'datatype': int,
             'projection': [
-                '__hosts__.state',
-                '__hosts__.state_id',
-                '__hosts__.state_type_id'
+                'hosts.state',
+                'hosts.state_id',
+                'hosts.state_type_id'
             ],
             'filters': {},
         },
@@ -2789,9 +2787,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hosts", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__hosts__.state',
-                '__hosts__.state_id',
-                '__hosts__.state_type_id'
+                'hosts.state',
+                'hosts.state_id',
+                'hosts.state_type_id'
             ],
             'filters': {},
         },
@@ -2799,9 +2797,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hosts", 1, 2),
             'datatype': int,
             'projection': [
-                '__hosts__.state',
-                '__hosts__.state_id',
-                '__hosts__.state_type_id'
+                'hosts.state',
+                'hosts.state_id',
+                'hosts.state_type_id'
             ],
             'filters': {},
         },
@@ -2810,9 +2808,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hosts", 1, 0),
             'datatype': int,
             'projection': [
-                '__hosts__.state',
-                '__hosts__.state_id',
-                '__hosts__.state_type_id'
+                'hosts.state',
+                'hosts.state_id',
+                'hosts.state_type_id'
             ],
             'filters': {},
         },
@@ -2821,9 +2819,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hosts", 1),
             'datatype': int,
             'projection': [
-                '__hosts__.state',
-                '__hosts__.state_id',
-                '__hosts__.state_type_id'
+                'hosts.state',
+                'hosts.state_id',
+                'hosts.state_type_id'
             ],
             'filters': {},
         },
@@ -2864,47 +2862,47 @@ livestatus_attribute_map = {
         'num_hosts': {
             'description': 'The total number of hosts in the group',
             'function': lambda item: len(item.members),
-            'projection': ["__hosts__.host_name"],
+            'projection': ["hosts.host_name"],
         },
         'num_hosts_down': {
             'description': 'The number of hosts in the group that are down',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__hosts__.state_id"],
+            'projection': ["hosts.state_id"],
             'filters': {},
         },
         'num_hosts_pending': {
             'description': 'The number of hosts in the group that are pending',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__hosts__.state_id"],
+            'projection': ["hosts.state_id"],
             'filters': {},
         },
         'num_hosts_unreach': {
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__hosts__.state_id"],
+            'projection': ["hosts.state_id"],
             'filters': {},
         },
         'num_hosts_up': {
             'description': 'The number of hosts in the group that are up',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__hosts__.state_id"],
+            'projection': ["hosts.state_id"],
             'filters': {},
         },
         'num_services': {
             'description': 'The total number of services of hosts in this group',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__services__.state_id"],
+            'projection': ["services.state_id"],
             'filters': {},
         },
         'worst_host_state': {
             'description': 'The worst state of all of the groups\' hosts (UP <= UNREACHABLE <= DOWN)',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__services__.state_id"],
+            'projection': ["services.state_id"],
             'filters': {},
         },
     },
@@ -2947,7 +2945,7 @@ livestatus_attribute_map = {
             'description': 'The number of services in the group that are CRIT',
             'function': lambda item: 0, #FIXME
             'datatype': int,
-            'projection': ["__services__.state_id"],
+            'projection': ["services.state_id"],
             'filters': {},
         },
     },
@@ -3323,14 +3321,14 @@ livestatus_attribute_map = {
             'description': 'An optional URL to custom actions or information about the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "action_url"),
             'filters': {
-                'attr': '__hostgroup__.action_url',
+                'attr': 'hostgroup.action_url',
             },
         },
         'hostgroup_alias': {
             'description': 'An alias of the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "alias"),
             'filters': {
-                'attr': '__hostgroup__.alias',
+                'attr': 'hostgroup.alias',
             },
         },
         'hostgroup_members': {
@@ -3338,7 +3336,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "hostgroup", "members"),
             'datatype': list,
             'filters': {
-                'attr': '__hostgroup__.members',
+                'attr': 'hostgroup.members',
             },
         },
         'hostgroup_members_with_state': {
@@ -3350,31 +3348,31 @@ livestatus_attribute_map = {
             'description': 'Name of the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "hostgroup_name"),
             'filters': {
-                'attr': '__hostgroup__.hostgroup_name',
+                'attr': 'hostgroup.hostgroup_name',
             },
         },
         'hostgroup_notes': {
             'description': 'Optional notes to the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "notes"),
             'filters': {
-                'attr': '__hostgroup__.notes',
+                'attr': 'hostgroup.notes',
             },
         },
         'hostgroup_notes_url': {
             'description': 'An optional URL with further information about the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "notes_url"),
             'filters': {
-                'attr': '__hostgroup__.notes_url',
+                'attr': 'hostgroup.notes_url',
             },
         },
         'hostgroup_num_hosts': {
             'description': 'The total number of hosts in the group',
-            'function': lambda item: len(item["__hostgroup_hosts__"]),
+            'function': lambda item: len(item["hostgroup_hosts"]),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.host_name',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.host_name',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3383,9 +3381,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", 1, 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3394,9 +3392,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3405,9 +3403,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", 1, 2),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3416,20 +3414,20 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", 1, 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
         'hostgroup_num_services': {
             'description': 'The total number of services of hosts in this group',
-            'function': lambda item: len(item["__hostgroup_services__"]),
+            'function': lambda item: len(item["hostgroup_services"]),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3438,9 +3436,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 2),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3449,9 +3447,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 2),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3460,9 +3458,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3471,9 +3469,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 3),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3482,9 +3480,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3493,9 +3491,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3504,9 +3502,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3515,9 +3513,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 3),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3526,9 +3524,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3537,9 +3535,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hostgroup_hosts", 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3548,9 +3546,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hostgroup_services", 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3559,9 +3557,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hostgroup_services", 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3571,14 +3569,14 @@ livestatus_attribute_map = {
             'description': 'An optional URL to custom notes or actions on the service group',
             'function': lambda item: linked_attr(item, "servicegroup", "action_url"),
             'filters': {
-                'attr': '__servicegroup__.action_url',
+                'attr': 'servicegroup.action_url',
             },
         },
         'servicegroup_alias': {
             'description': 'An alias of the service group',
             'function': lambda item: linked_attr(item, "servicegroup", "alias"),
             'filters': {
-                'attr': '__servicegroup__.alias',
+                'attr': 'servicegroup.alias',
             },
         },
         'servicegroup_members': {
@@ -3586,7 +3584,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "servicegroup", "members"),
             'datatype': list,
             'filters': {
-                'attr': '__servicegroup__.members',
+                'attr': 'servicegroup.members',
             },
         },
         'servicegroup_members_with_state': {
@@ -3598,31 +3596,31 @@ livestatus_attribute_map = {
             'description': 'The name of the service group',
             'function': lambda item: linked_attr(item, "servicegroup", "servicegroup_name"),
             'filters': {
-                'attr': '__servicegroup__.servicegroup_name',
+                'attr': 'servicegroup.servicegroup_name',
             },
         },
         'servicegroup_notes': {
             'description': 'Optional additional notes about the service group',
             'function': lambda item: linked_attr(item, "servicegroup", "notes"),
             'filters': {
-                'attr': '__servicegroup__.notes',
+                'attr': 'servicegroup.notes',
             },
         },
         'servicegroup_notes_url': {
             'description': 'An optional URL to further notes on the service group',
             'function': lambda item: linked_attr(item, "servicegroup", "notes_url"),
             'filters': {
-                'attr': '__servicegroup__.notes_url',
+                'attr': 'servicegroup.notes_url',
             },
         },
         'servicegroup_num_services': {
             'description': 'The total number of services in the group',
-            'function': lambda item: len(item["__servicegroup_services__"]),
+            'function': lambda item: len(item["servicegroup_services"]),
             'datatype': int,
             'projection': [
-                '__servicegroup_hosts__.state',
-                '__servicegroup_hosts__.state_id',
-                '__servicegroup_hosts__.state_type_id'
+                'servicegroup_hosts.state',
+                'servicegroup_hosts.state_id',
+                'servicegroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3631,9 +3629,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 0, 2),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3642,9 +3640,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 1, 2),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3653,9 +3651,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 1, 0),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3664,9 +3662,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 1, 1),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3675,9 +3673,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 0, 0),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3686,9 +3684,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3697,9 +3695,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 1, 3),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3708,9 +3706,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "servicegroup_services", 0, 1),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3719,9 +3717,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "servicegroup_services", 1),
             'datatype': int,
             'projection': [
-                '__servicegroup_services__.state',
-                '__servicegroup_services__.state_id',
-                '__servicegroup_services__.state_type_id'
+                'servicegroup_services.state',
+                'servicegroup_services.state_id',
+                'servicegroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3742,14 +3740,14 @@ livestatus_attribute_map = {
             'description': 'An optional URL to custom actions or information about the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "action_url"),
             'filters': {
-                'attr': '__hostgroup__.action_url',
+                'attr': 'hostgroup.action_url',
             },
         },
         'hostgroup_alias': {
             'description': 'An alias of the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "alias"),
             'filters': {
-                'attr': '__hostgroup__.alias',
+                'attr': 'hostgroup.alias',
             },
         },
         'hostgroup_members': {
@@ -3757,7 +3755,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "hostgroup", "members"),
             'datatype': list,
             'filters': {
-                'attr': '__hostgroup__.members',
+                'attr': 'hostgroup.members',
             },
         },
         'hostgroup_members_with_state': {
@@ -3769,31 +3767,31 @@ livestatus_attribute_map = {
             'description': 'Name of the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "hostgroup_name"),
             'filters': {
-                'attr': '__hostgroup__.hostgroup_name',
+                'attr': 'hostgroup.hostgroup_name',
             },
         },
         'hostgroup_notes': {
             'description': 'Optional notes to the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "notes"),
             'filters': {
-                'attr': '__hostgroup__.notes',
+                'attr': 'hostgroup.notes',
             },
         },
         'hostgroup_notes_url': {
             'description': 'An optional URL with further information about the hostgroup',
             'function': lambda item: linked_attr(item, "hostgroup", "notes_url"),
             'filters': {
-                'attr': '__hostgroup__.notes_url',
+                'attr': 'hostgroup.notes_url',
             },
         },
         'hostgroup_num_hosts': {
             'description': 'The total number of hosts in the group',
-            'function': lambda item: len(item["__hostgroup_hosts__"]),
+            'function': lambda item: len(item["hostgroup_hosts"]),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.host_name',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.host_name',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3802,9 +3800,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", 1, 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3813,9 +3811,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3824,9 +3822,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", 1, 2),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3835,20 +3833,20 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_hosts", 1, 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
         'hostgroup_num_services': {
             'description': 'The total number of services of hosts in this group',
-            'function': lambda item: len(item["__hostgroup_services__"]),
+            'function': lambda item: len(item["hostgroup_services"]),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3857,9 +3855,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 2),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3868,9 +3866,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 2),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3879,9 +3877,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3890,9 +3888,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 3),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3901,9 +3899,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 1, 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3912,9 +3910,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3923,9 +3921,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", state_id="PENDING"),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3934,9 +3932,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 3),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3945,9 +3943,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_count(item, "hostgroup_services", 0, 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3956,9 +3954,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hostgroup_hosts", 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_hosts__.state',
-                '__hostgroup_hosts__.state_id',
-                '__hostgroup_hosts__.state_type_id'
+                'hostgroup_hosts.state',
+                'hostgroup_hosts.state_id',
+                'hostgroup_hosts.state_type_id'
             ],
             'filters': {}
         },
@@ -3967,9 +3965,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hostgroup_services", 1),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },
@@ -3978,9 +3976,9 @@ livestatus_attribute_map = {
             'function': lambda item: state_worst(item, "hostgroup_services", 0),
             'datatype': int,
             'projection': [
-                '__hostgroup_services__.state',
-                '__hostgroup_services__.state_id',
-                '__hostgroup_services__.state_type_id'
+                'hostgroup_services.state',
+                'hostgroup_services.state_id',
+                'hostgroup_services.state_type_id'
             ],
             'filters': {}
         },

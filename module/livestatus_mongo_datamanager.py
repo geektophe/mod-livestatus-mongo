@@ -221,7 +221,7 @@ class DataManager(object):
                 {
                     "$lookup": {
                         'from': 'services',
-                        'as': '__services__',
+                        'as': 'services',
                         'localField': 'host_name',
                         'foreignField': 'host_name',
                     }
@@ -231,8 +231,8 @@ class DataManager(object):
                         '_id': 1,
                         'contacts': 1,
                         'host_name': 1,
-                        '__services__._id': 1,
-                        '__services__.contacts': 1,
+                        'services._id': 1,
+                        'services.contacts': 1,
                     }
                 },
             ])
@@ -240,7 +240,7 @@ class DataManager(object):
             for host in hosts:
                 members.append(host["_id"])
                 contacts.extend(host.get("contacts", []))
-                for service in host["__services__"]:
+                for service in host["services"]:
                     svc_id = service["_id"]
                     contacts.extend(service.get("contacts", []))
                     # Registers hostgroup intto the service
@@ -277,7 +277,7 @@ class DataManager(object):
                 {
                     "$lookup": {
                         'from': 'hosts',
-                        'as': '__hosts__',
+                        'as': 'hosts',
                         'localField': 'host_name',
                         'foreignField': 'host_name',
                     }
@@ -287,7 +287,7 @@ class DataManager(object):
                         '_id': 1,
                         'contacts': 1,
                         'host_name': 1,
-                        '__hosts__.contacts': 1,
+                        'hosts.contacts': 1,
                     }
                 },
             ])
@@ -297,7 +297,7 @@ class DataManager(object):
                 members_hosts.append(service["host_name"])
                 hname = service["host_name"]
                 hosts_sg.setdefault(hname, []).append(group_name)
-                for host in service["__hosts__"]:
+                for host in service["hosts"]:
                     contacts.extend(host.get("contacts", []))
                     # Registers serviecgroup intto the host
             members = list(set(members))
@@ -1268,14 +1268,14 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        if not projection or any([p.startswith("__services__") for p in projection]):
+        if not projection or any([p.startswith("services.") for p in projection]):
             return [
                 {
                     "$lookup": {
                         "from": "services",
                         "localField": "host_name",
                         "foreignField": "host_name",
-                        "as": "__services__",
+                        "as": "services",
                     },
                 }
             ]
@@ -1292,17 +1292,17 @@ class DataManager(object):
         """
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
-        if not projection or any([p.startswith("__host__") for p in projection]):
+        if not projection or any([p.startswith("host.") for p in projection]):
             return [
                 {
                     "$lookup": {
                         "from": "hosts",
                         "localField": "host_name",
                         "foreignField": "host_name",
-                        "as": "__host__",
+                        "as": "host",
                     },
                 },
-                {"$unwind": "$__host__"},
+                {"$unwind": "$host"},
             ]
         else:
             return []
@@ -1318,22 +1318,22 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projection or any([p.startswith("__hosts__") for p in projection]):
+        if not projection or any([p.startswith("hosts.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "hostgroup_name",
                     "foreignField": "hostgroups",
-                    "as": "__hosts__",
+                    "as": "hosts",
                 }
             })
-        if not projection or any([p.startswith("__services__") for p in projection]):
+        if not projection or any([p.startswith("services.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "hostgroup_name",
                     "foreignField": "hostgroups",
-                    "as": "__services__",
+                    "as": "services",
                 }
             })
         return lookup
@@ -1349,22 +1349,22 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projection or any([p.startswith("__hosts__") for p in projection]):
+        if not projection or any([p.startswith("hosts.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "servicegroup_name",
                     "foreignField": "servicegroups",
-                    "as": "__hosts__",
+                    "as": "hosts",
                 }
             })
-        if not projection or any([p.startswith("__services__") for p in projection]):
+        if not projection or any([p.startswith("services.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "servicegroup_name",
                     "foreignField": "servicegroups",
-                    "as": "__services__",
+                    "as": "services",
                 }
             })
         return lookup
@@ -1380,45 +1380,45 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projection or any([p.startswith("__services__") for p in projection]):
+        if not projection or any([p.startswith("services.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "services",
                         "localField": "host_name",
                         "foreignField": "host_name_name",
-                        "as": "__services__",
+                        "as": "services",
                     }
                 },
             ])
-        if not projection or any([p.startswith("__hostgroup__") for p in projection]):
+        if not projection or any([p.startswith("hostgroup.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "hostgroups",
                         "localField": "hostgroups",
                         "foreignField": "hostgroup_name",
-                        "as": "__hostgroup__",
+                        "as": "hostgroup",
                     }
                 },
-                {"$unwind": "$__hostgroup__"},
+                {"$unwind": "$hostgroup"},
             ])
-        if not projection or any([p.startswith("__hostgroup_hosts__") for p in projection]):
+        if not projection or any([p.startswith("hostgroup_hosts.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "hostgroups",
                     "foreignField": "hostgroups",
-                    "as": "__hostgroup_hosts__",
+                    "as": "hostgroup_hosts",
                 }
             })
-        if not projection or any([p.startswith("__hostgroup_services__") for p in projection]):
+        if not projection or any([p.startswith("hostgroup_services.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "hostgroups",
                     "foreignField": "hostgroups",
-                    "as": "__hostgroup_services__",
+                    "as": "hostgroup_services",
                 }
             })
         return lookup
@@ -1434,46 +1434,46 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projection or any([p.startswith("__host__") for p in projection]):
+        if not projection or any([p.startswith("host.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "hosts",
                         "localField": "host_name",
                         "foreignField": "host_name",
-                        "as": "__host__",
+                        "as": "host",
                     }
                 },
-                {"$unwind": "$__host__"}
+                {"$unwind": "$host"}
             ])
-        if not projection or any([p.startswith("__servicegroup__") for p in projection]):
+        if not projection or any([p.startswith("servicegroup.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "servicegroups",
                         "localField": "servicegroups",
                         "foreignField": "servicegroup_name",
-                        "as": "__servicegroup__",
+                        "as": "servicegroup",
                     }
                 },
-                {"$unwind": "$__servicegroup__"}
+                {"$unwind": "$servicegroup"}
             ])
-        if not projection or any([p.startswith("__servicegroup_hosts__") for p in projection]):
+        if not projection or any([p.startswith("servicegroup_hosts.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "servicegroups",
                     "foreignField": "servicegroups",
-                    "as": "__servicegroup_hosts__",
+                    "as": "servicegroup_hosts",
                 }
             })
-        if not projection or any([p.startswith("__servicegroup_services__") for p in projection]):
+        if not projection or any([p.startswith("servicegroup_services.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "servicegroups",
                     "foreignField": "servicegroups",
-                    "as": "__servicegroup_services__",
+                    "as": "servicegroup_services",
                 }
             })
         return lookup
@@ -1489,46 +1489,46 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
-        if not projection or any([p.startswith("__host__") for p in projection]):
+        if not projection or any([p.startswith("host.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "hosts",
                         "localField": "host_name",
                         "foreignField": "host_name",
-                        "as": "__host__",
+                        "as": "host",
                     }
                 },
-                {"$unwind": "$__host__"}
+                {"$unwind": "$host"}
             ])
-        if not projection or any([p.startswith("__hostgroup__") for p in projection]):
+        if not projection or any([p.startswith("hostgroup.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "hostgroups",
                         "localField": "hostgroups",
                         "foreignField": "hostgroup_name",
-                        "as": "__hostgroup__",
+                        "as": "hostgroup",
                     }
                 },
-                {"$unwind": "$__hostgroup__"}
+                {"$unwind": "$hostgroup"}
             ])
-        if not projection or any([p.startswith("__hostgroup_hosts__") for p in projection]):
+        if not projection or any([p.startswith("hostgroup_hosts.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "hosts",
                     "localField": "hostgroups",
                     "foreignField": "hostgroups",
-                    "as": "__hostgroup_hosts__",
+                    "as": "hostgroup_hosts",
                 }
             })
-        if not projection or any([p.startswith("__hostgroup_services__") for p in projection]):
+        if not projection or any([p.startswith("hostgroup_services.") for p in projection]):
             lookup.append({
                 "$lookup": {
                     "from": "services",
                     "localField": "hostgroups",
                     "foreignField": "hostgroups",
-                    "as": "__hostgroup_services__",
+                    "as": "hostgroup_services",
                 }
             })
         return lookup
