@@ -24,6 +24,7 @@
 
 import os
 import re
+import time
 
 from shinken.bin import VERSION
 from shinken.macroresolver import MacroResolver
@@ -398,9 +399,6 @@ livestatus_attribute_map = {
             'filters': {
                 'attr': 'hostgroups',
             },
-        },
-        'host_name': {
-            'description': 'Host name',
         },
         'icon_image': {
             'description': 'The name of an image file to be used in the web pages',
@@ -1920,9 +1918,6 @@ livestatus_attribute_map = {
             'description': 'The number of scheduled downtimes the service is currently in',
             'datatype': int,
         },
-        'service_description': {
-            'description': 'Description of the service (also used as key)',
-        },
         'servicegroups': {
             'description': 'A list of all service groups the service is in',
             'datatype': list,
@@ -2109,6 +2104,13 @@ livestatus_attribute_map = {
             'type': list,
             'projection': [],
             'filters': {},
+        },
+        'service_description': {
+            'description': 'Description of the service',
+            'function': lambda item: linked_attr(item, "service", "service_description"),
+            'filters': {
+                'attr': 'service.service_description',
+            },
         },
         'service_display_name': {
             'description': 'Optional display name of the service - not used by Nagios\' web interface',
@@ -3075,7 +3077,6 @@ livestatus_attribute_map = {
         },
         'is_service': {
             'description': '0, if this entry is for a host, 1 if it is for a service',
-            'function': lambda item: item.get("service") is not None,
             'datatype': bool,
         },
         'start_time': {
@@ -3088,7 +3089,6 @@ livestatus_attribute_map = {
         },
         'type': {
             'description': 'The type of the downtime: 0 if it is active, 1 if it is pending',
-            'function': lambda item: {True: 0, False: 1}[item.is_in_effect],
             'datatype': int,
         },
     },
@@ -4660,6 +4660,7 @@ def import_mapping(import_from, import_to):
     for attr, mapping in mapping_from.items():
         if attr not in mapping_to:
             mapping_to[attr] = mapping_from[attr]
+            mapping_to[attr]["foreign"] = True
 
 
 # Updates Service, Downtime and Comment classe definitions with HostLink

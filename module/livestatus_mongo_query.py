@@ -148,7 +148,8 @@ class LiveStatusQuery(object):
             _, attribute, operator = self.split_option(line, 2)
             reference = ''
         else:
-            raise LiveStatusQueryError(452, 'invalid filter: %s' % line)
+            raise LiveStatusQueryError(450, 'invalid filter: %s' % line)
+
         # Parses a row with patterns like:
         # Filter: state = 3
         # Or
@@ -168,7 +169,7 @@ class LiveStatusQuery(object):
                 _, alias = reference.split(' ', 2)
             return attribute, operator, None
         else:
-            raise LiveStatusQueryError(452, 'invalid filter: %s' % line)
+            raise LiveStatusQueryError(450, 'invalid filter: %s' % line)
 
     def parse_input(self, data):
         """Parse the lines of a livestatus request.
@@ -612,8 +613,12 @@ class LiveStatusQuery(object):
         :param str operator: The comparison operator
         :param str attribute: The attribute name to compare
         :param str reference: The reference value to compare to
-
         """
+        if attribute not in self.datamgr.mapping[self.table]:
+            raise LiveStatusQueryError(
+                450,
+                "no column %s in table %s" % (attribute, self.table)
+            )
         # Map livestatus attribute `name` to the object's name
         fct = self.operator_mapping.get(operator)
         # Matches operators

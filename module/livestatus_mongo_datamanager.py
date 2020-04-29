@@ -30,6 +30,7 @@ from mongo_mapping import table_class_map
 from livestatus_query_error import LiveStatusQueryError
 from pprint import pprint
 import pymongo
+import time
 import re
 
 class DataManager(object):
@@ -38,6 +39,7 @@ class DataManager(object):
 
     def __init__(self):
         self.db = None
+        self.instances = {}
 
     def load(self, db):
         self.db = db
@@ -74,6 +76,12 @@ class DataManager(object):
         if handler is not None:
             handler(brok)
 
+    def manage_clean_all_my_instance_id_brok(self, brok):
+        print("Brok: %s" % brok.type)
+        pprint(brok.data)
+        instance_id = brok.data["instance_id"]
+        self.instances[instance_id] = int(time.time())
+
     def manage_program_status_brok(self, brok):
         """
         Display brok content
@@ -89,6 +97,7 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
+        self.db.hosts
         # Manages some brok format curiosities
         # Hostgroups transformation into list
         hg = brok.data.get("hostgroups")
@@ -216,6 +225,15 @@ class DataManager(object):
         """
         print("Brok: %s" % brok.type)
         pprint(brok.data)
+        self.cleanup_old_objects(brok.data["instance_id"])
+        self.update_hostgroup_links()
+        self.update_servicegroup_links()
+
+    def update_hostgroup_links(self):
+        """
+        Adds the necessary attributes to to properly link hotsgroups to
+        hosts, services and contacts.
+        """
         # Builds cross objects references
         # Hostgroups -> hosts (members)
         # Hostgroups -> services (members_hosts)
@@ -231,19 +249,19 @@ class DataManager(object):
                 {"$match": {"hostgroups": {"$in": [group_name]}}},
                 {
                     "$lookup": {
-                        'from': 'services',
-                        'as': 'services',
-                        'localField': 'host_name',
-                        'foreignField': 'host_name',
+                        "from": "services",
+                        "as": "services",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
                     }
                 },
                 {
                     "$project": {
-                        '_id': 1,
-                        'contacts': 1,
-                        'host_name': 1,
-                        'services._id': 1,
-                        'services.contacts': 1,
+                        "_id": 1,
+                        "contacts": 1,
+                        "host_name": 1,
+                        "services._id": 1,
+                        "services.contacts": 1,
                     }
                 },
             ])
@@ -273,6 +291,11 @@ class DataManager(object):
                 {"$set": {"hostgroups": list(set(hostgroups))}},
             )
 
+    def update_servicegroup_links(self):
+        """
+        Adds the necessary attributes to to properly link servicegroups to
+        hosts, services and contacts.
+        """
         # Servicegroups -> services (members)
         # Servicegroups -> services (members_hosts)
         # Servicegroups -> services (members_services)
@@ -287,18 +310,18 @@ class DataManager(object):
                 {"$match": {"servicegroups": {"$in": [group_name]}}},
                 {
                     "$lookup": {
-                        'from': 'hosts',
-                        'as': 'hosts',
-                        'localField': 'host_name',
-                        'foreignField': 'host_name',
+                        "from": "hosts",
+                        "as": "hosts",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
                     }
                 },
                 {
                     "$project": {
-                        '_id': 1,
-                        'contacts': 1,
-                        'host_name': 1,
-                        'hosts.contacts': 1,
+                        "_id": 1,
+                        "contacts": 1,
+                        "host_name": 1,
+                        "hosts.contacts": 1,
                     }
                 },
             ])
@@ -326,6 +349,32 @@ class DataManager(object):
             self.db.hosts.update(
                 {"_id": hst_id},
                 {"$set": {"servicegroups": list(set(servicegroups))}},
+            )
+
+    def cleanup_old_objects(self, instance_id):
+        """
+        Removes previous versions of objects for a given instance
+        """
+        collections = [
+            "commands",
+            "comments",
+            "contactgroups",
+            "contacts",
+            "downtimes",
+            "hostgroups",
+            "hosts",
+            "servicegroups",
+            "services",
+            "timeperiods"
+        ]
+        instance_version = self.instances[instance_id]
+        for name in collections:
+            collection = getattr(self.db, name)
+            collection.delete_many(
+                {
+                    "instance_id": instance_id,
+                    "instance_version": {"$ne": instance_version},
+                }
             )
 
     def manage_update_program_status_brok(self, brok):
@@ -455,39 +504,23 @@ class DataManager(object):
                     brok.data.get("service_description") == "test_ok_00":
                 print("Brok type: %s" % brok.type)
                 pprint(brok.data)
-        data = {}
+        data = {
+            "instance_version": self.instances[brok.data["instance_id"]]
+        }
         for name, value in brok.data.items():
             if name == "dateranges":
                 continue
             else:
                 data[name] = self.normalize(value)
 
-        # Manages downtimes and comments for hosts and services
-        if "downtimes" in data:
-            data["downtimes_with_info"] = []
-            for i, downtime in enumerate(data["downtimes"]):
-                self.db.downtimes.update(
-                    {"_id": downtime["id"]},
-                    {"$set": downtime},
-                    upsert=True
-                )
-                data["downtimes"][i] = downtime["id"]
-                data["downtimes_with_info"].append(
-                    (downtime["id"], downtime["author"], downtime["comment"])
-                )
-
-        if "comments" in data:
-            data["comments_with_info"] = []
-            for i, comment in enumerate(data["comments"]):
-                self.db.comments.update(
-                    {"_id": comment["id"]},
-                    {"$set": comment},
-                    upsert=True
-                )
-                data["comments"][i] = comment["id"]
-                data["comments_with_info"].append(
-                    (comment["id"], comment["author"], comment["comment"])
-                )
+        # Manages downtimes
+        if object_type in ("host", "service"):
+            if "comments" in data:
+                self.add_comments(data, "downtimes")
+                self.cleanup_comments(data, "comments")
+            if "downtimes" in data:
+                self.add_comments(data, "comments")
+                self.cleanup_comments(data, "downtimes")
 
         # Insert brok into database
         # Services are particular because their name is a combination of
@@ -521,13 +554,78 @@ class DataManager(object):
             upsert=True
         )
 
+    def add_comments(self, data, kind):
+        """
+        Add separate comment or downtime objects from data
+
+        :param dict data: The brok data
+        :rtype: dict
+        :retun: The modified data
+        """
+        collection = getattr(self.db, kind)
+        kind_with_info = "%s_with_info" % kind
+        data[kind_with_info] = []
+        for i, item in enumerate(data[kind]):
+            # Pre calculated fields
+            item["host"] = data["host_name"]
+            if "service_description" in data:
+                service_id = "%s/%s" % (
+                    data["host_name"],
+                    data["service_description"]
+                )
+                item["service"] = service_id
+            if kind == "downtimes":
+                item["type"] = {True: 0, False: 1}[item["is_in_effect"]]
+            item["is_service"] = "service_description" in data
+            item["instance_id"] = data["instance_id"]
+            item["instance_version"] = data["instance_version"]
+            # Adds item
+            collection.update(
+                {"_id": item["id"]},
+                {"$set": item},
+                upsert=True
+            )
+            # Update parent object
+            data[kind][i] = item["id"]
+            data[kind_with_info].append(
+                (item["id"], item["author"], item["comment"])
+            )
+
+    def cleanup_comments(self, data, kind):
+        """
+        Cleans up no more referenced comment or downtime objects
+
+        :param dict data: The brok data
+        :rtype: dict
+        :retun: The modified data
+        """
+        collection = getattr(self.db, kind)
+        if "service_description" in data:
+            service_id = "%s/%s" % (
+                data["host_name"],
+                data["service_description"]
+            )
+            query = {
+                "is_service": True,
+                "service": service_id,
+            }
+        else:
+            query = {
+                "is_service": False,
+                "host": data["host_name"],
+            }
+        if data[kind]:
+            query["_id"] = {"$nin": data[kind]}
+        collection.delete_many(query)
+        return data
+
     def make_stack(self):
         """
         Builds a stack to add filters to
         """
         return []
 
-    def get_column_attribute(self, table, attribute, raise_error=True):
+    def get_column_attribute(self, table, column, raise_error=True):
         """
         Return the attribute name to use to query the mongo database.
 
@@ -536,18 +634,20 @@ class DataManager(object):
         from LQL.
 
         :param str table: The table the attribute is in
-        :param str attribute: The LQL requested attribute
+        :param str column: The LQL requested column
         :param bool raise_error: A flag indicating if an error should be risen
                                  when an attribute is not usable as filter
         :rtype: str
-        :return: The attribute name to use in mongo query
+        :return: The column name to use in mongo query
         """
-        mapping = self.mapping[table][attribute]
+        if column not in self.mapping[table]:
+            raise LiveStatusQueryError(450, "no column %s in table" % (column, table))
+        mapping = self.mapping[table][column]
         # Special case, if mapping is {}, no filtering is supported on this
         # attribute
         if "filters" in mapping and mapping["filters"] == {} and raise_error:
-            raise LiveStatusQueryError(452, "can't filter on attribute %s" % attribute)
-        return mapping.get("filters", {}).get("attr", attribute)
+            raise LiveStatusQueryError(452, "can't filter on column %s" % column)
+        return mapping.get("filters", {}).get("attr", column)
 
     def get_column_datatype(self, table, attribute):
         """
@@ -560,7 +660,7 @@ class DataManager(object):
         """
         return self.mapping[table][attribute].get("datatype")
 
-    def add_filter_eq(self, stack, table, attribute, reference, ignore_type=False):
+    def add_filter_eq(self, stack, table, attribute, reference):
         """
         Transposes an equalitiy operator filter into a mongo query
 
@@ -571,11 +671,24 @@ class DataManager(object):
         """
         attrname = self.get_column_attribute(table, attribute)
         attrtype = self.get_column_datatype(table, attribute)
-        if attrtype is list and ignore_type is False:
+        if attrtype is list:
             stack.append({
                 attrname: []
             })
-        elif attrtype is not None and ignore_type is False:
+        elif attrtype is bool:
+            if reference in (True, 1, '1', 'true', 'True', 'on'):
+                reference = True
+            elif reference in (False, 0, '0', 'false', 'False', 'off'):
+                reference = False
+            else:
+                raise LiveStatusQueryError(
+                    452,
+                    'invalid value for bool: %s' % reference
+                )
+            stack.append({
+                attrname: {"$eq": reference}
+            })
+        elif attrtype is not None:
             stack.append({
                 attrname: {
                     "$eq": attrtype(reference)
@@ -588,7 +701,7 @@ class DataManager(object):
                 }
             })
 
-    def add_filter_eqeq(self, stack, table, attribute, reference, ignore_type=False):
+    def add_filter_eqeq(self, stack, table, attribute, reference):
         """
         Transposes a generic equalitiy operator filter into a mongo query
 
@@ -617,7 +730,7 @@ class DataManager(object):
         attrname = self.get_column_attribute(table, attribute)
         attrtype = self.get_column_datatype(table, attribute)
         if attrtype is list:
-            raise LiveStatusQueryError(452, 'operator not available for lists')
+            raise LiveStatusQueryError(450, 'operator not available for lists')
         # Builds regular expression
         reg = "^%s$" % reference
         stack.append({
@@ -805,6 +918,19 @@ class DataManager(object):
         if attrtype is list:
             stack.append({
                 attrname: {"$ne": []}
+            })
+        elif attrtype is bool:
+            if reference in (True, 1, '1', 'true', 'True', 'on'):
+                reference = True
+            elif reference in (False, 0, '0', 'false', 'False', 'off'):
+                reference = False
+            else:
+                raise LiveStatusQueryError(
+                    452,
+                    'invalid value for bool: %s' % reference
+                )
+            stack.append({
+                attrname: {"$ne": reference}
             })
         elif attrtype is not None:
             stack.append({
@@ -1355,7 +1481,12 @@ class DataManager(object):
                         "as": "host",
                     },
                 },
-                {"$unwind": "$host"},
+                {
+                    "$unwind": {
+                        "path": "$host",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ]
         else:
             return []
@@ -1433,7 +1564,12 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = [
-            {"$unwind": "$hostgroups"}
+            {
+                "$unwind": {
+                    "path": "$hostgroups",
+                    "preserveNullAndEmptyArrays": True
+                }
+            }
         ]
         if not projection or any([p.startswith("services.") for p in projection]):
             lookup.extend([
@@ -1456,7 +1592,12 @@ class DataManager(object):
                         "as": "hostgroup",
                     }
                 },
-                {"$unwind": "$hostgroup"},
+                {
+                    "$unwind": {
+                        "path": "$hostgroup",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("hostgroup_hosts.") for p in projection]):
             lookup.append({
@@ -1489,7 +1630,12 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = [
-            {"$unwind": "$servicegroups"}
+            {
+                "$unwind": {
+                    "path": "$servicegroups",
+                    "preserveNullAndEmptyArrays": True
+                    }
+            }
         ]
         if not projection or any([p.startswith("host.") for p in projection]):
             lookup.extend([
@@ -1501,7 +1647,12 @@ class DataManager(object):
                         "as": "host",
                     }
                 },
-                {"$unwind": "$host"}
+                {
+                    "$unwind": {
+                        "path": "$host",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("servicegroup.") for p in projection]):
             lookup.extend([
@@ -1513,7 +1664,12 @@ class DataManager(object):
                         "as": "servicegroup",
                     }
                 },
-                {"$unwind": "$servicegroup"}
+                {
+                    "$unwind": {
+                        "path": "$servicegroup",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("servicegroup_hosts.") for p in projection]):
             lookup.append({
@@ -1546,7 +1702,12 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = [
-            {"$unwind": "$hostgroups"}
+            {
+                "$unwind": {
+                    "path": "$hostgroups",
+                    "preserveNullAndEmptyArrays": True
+                    }
+            }
         ]
         if not projection or any([p.startswith("host.") for p in projection]):
             lookup.extend([
@@ -1558,7 +1719,12 @@ class DataManager(object):
                         "as": "host",
                     }
                 },
-                {"$unwind": "$host"}
+                {
+                    "$unwind": {
+                        "path": "$host",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("hostgroup.") for p in projection]):
             lookup.extend([
@@ -1570,7 +1736,12 @@ class DataManager(object):
                         "as": "hostgroup",
                     }
                 },
-                {"$unwind": "$hostgroup"}
+                {
+                    "$unwind": {
+                        "path": "$hostgroup",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("hostgroup_hosts.") for p in projection]):
             lookup.append({
@@ -1608,24 +1779,34 @@ class DataManager(object):
                 {
                     "$lookup": {
                         "from": "hosts",
-                        "localField": "id",
-                        "foreignField": "downtimes",
+                        "localField": "host",
+                        "foreignField": "_id",
                         "as": "host",
                     }
                 },
-                {"$unwind": "$host"}
+                {
+                    "$unwind": {
+                        "path": "$host",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("service.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "services",
-                        "localField": "id",
-                        "foreignField": "downtimes",
+                        "localField": "service",
+                        "foreignField": "_id",
                         "as": "service",
                     }
                 },
-                {"$unwind": "$service"}
+                {
+                    "$unwind": {
+                        "path": "$service",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         return lookup
 
@@ -1645,24 +1826,34 @@ class DataManager(object):
                 {
                     "$lookup": {
                         "from": "hosts",
-                        "localField": "id",
-                        "foreignField": "comments",
+                        "localField": "host",
+                        "foreignField": "_id",
                         "as": "host",
                     }
                 },
-                {"$unwind": "$host"}
+                {
+                    "$unwind": {
+                        "path": "$host",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         if not projection or any([p.startswith("service.") for p in projection]):
             lookup.extend([
                 {
                     "$lookup": {
                         "from": "services",
-                        "localField": "id",
-                        "foreignField": "comments",
+                        "localField": "service",
+                        "foreignField": "_id",
                         "as": "service",
                     }
                 },
-                {"$unwind": "$service"}
+                {
+                    "$unwind": {
+                        "path": "$service",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
             ])
         return lookup
 
