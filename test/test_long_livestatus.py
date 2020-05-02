@@ -98,40 +98,40 @@ class TestConfigBig(TestConfig):
         # Exact match
         expected_result = [['test_host_001', 'pending_001']]
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
         # Case insensitive match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name =~ TEST_host_001
+Columns: name alias
+Filter: name =~ TEST_host_001
 OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
         # Regex exact match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~ test_[a-z]+_001
+Columns: name alias
+Filter: name ~ test_[a-z]+_001
 OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
         # Regex case insensitive match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~~ TEST_[a-z]+_001
+Columns: name alias
+Filter: name ~~ TEST_[a-z]+_001
 OutputFormat: python
 """
         self.execute_and_assert(query, expected_result)
 
         # Miging several conditions
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~~ TEST_[a-z]+_001
+Columns: name alias
+Filter: name ~~ TEST_[a-z]+_001
 Filter: alias = pending_001
 OutputFormat: python
 """
@@ -139,8 +139,8 @@ OutputFormat: python
 
         # Miging several conditions
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~~ TEST_[a-z]+_001
+Columns: name alias
+Filter: name ~~ TEST_[a-z]+_001
 Filter: alias = fake
 OutputFormat: python
 """
@@ -148,8 +148,8 @@ OutputFormat: python
 
         # Integer ge comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts >= 5
 OutputFormat: python
 """
@@ -157,8 +157,8 @@ OutputFormat: python
 
         # Integer gt comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts > 5
 OutputFormat: python
 """
@@ -167,8 +167,8 @@ OutputFormat: python
 
         # Integer le comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts <= 5
 OutputFormat: python
 """
@@ -176,8 +176,8 @@ OutputFormat: python
         # Integer gt comparison
         self.execute_and_assert(query, expected_result)
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts < 5
 OutputFormat: python
 """
@@ -191,37 +191,37 @@ OutputFormat: python
 
         # Exact match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name != test_host_001
+Columns: name alias
+Filter: name != test_host_001
 OutputFormat: python
 """
         self.execute_and_assert(query, not_hosts_condition)
         # Case insensitive match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name !=~ TEST_host_001
+Columns: name alias
+Filter: name !=~ TEST_host_001
 OutputFormat: python
 """
         self.execute_and_assert(query, not_hosts_condition)
         # Regex exact match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name !~ test_[a-z]+_001
+Columns: name alias
+Filter: name !~ test_[a-z]+_001
 OutputFormat: python
 """
         self.execute_and_assert(query, not_hosts_condition)
         # Regex case insensitive match
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name !~~ TEST_[a-z]+_001
+Columns: name alias
+Filter: name !~~ TEST_[a-z]+_001
 OutputFormat: python
 """
         self.execute_and_assert(query, not_hosts_condition)
 
         # Integer ge comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts !>= 5
 OutputFormat: python
 """
@@ -229,8 +229,8 @@ OutputFormat: python
 
         # Integer gt comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts !> 5
 OutputFormat: python
 """
@@ -238,8 +238,8 @@ OutputFormat: python
 
         # Integer le comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts !<= 5
 OutputFormat: python
 """
@@ -247,8 +247,8 @@ OutputFormat: python
 
         # Integer gt comparison
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: max_check_attempts !< 5
 OutputFormat: python
 """
@@ -256,8 +256,8 @@ OutputFormat: python
 
         # List is empty
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: labels =
 OutputFormat: python
 """
@@ -265,8 +265,8 @@ OutputFormat: python
 
         # List is not empty
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: labels !=
 OutputFormat: python
 """
@@ -274,8 +274,8 @@ OutputFormat: python
 
         # List contains
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options >= u
 OutputFormat: python
 """
@@ -283,8 +283,8 @@ OutputFormat: python
 
         # List does not contain
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options < u
 OutputFormat: python
 """
@@ -292,8 +292,8 @@ OutputFormat: python
 
         # List contains (case insensitive)
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options <= U
 OutputFormat: python
 """
@@ -301,8 +301,8 @@ OutputFormat: python
 
         # List does not contains (case insensitive)
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options > U
 OutputFormat: python
 """
@@ -310,8 +310,8 @@ OutputFormat: python
 
         # List matches
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options ~ ^u$
 OutputFormat: python
 """
@@ -319,8 +319,8 @@ OutputFormat: python
 
         # List matches (case insensitive)
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options ~~ ^U$
 OutputFormat: python
 """
@@ -338,9 +338,9 @@ OutputFormat: python
 
         # Get an host
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
-Filter: host_name = test_host_002
+Columns: name alias
+Filter: name = test_host_001
+Filter: name = test_host_002
 Or: 2
 OutputFormat: python
 """
@@ -400,8 +400,8 @@ OutputFormat: python
         expected_result = [['test_host_001', 'pending_001']]
         # List matches (case insensitive)
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options ~~ ^U$
 OutputFormat: python
 """
@@ -413,8 +413,8 @@ OutputFormat: python
             self.assertIn(['test_host_002', 'down_002'], result)
 
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name = test_host_001
+Columns: name alias
+Filter: name = test_host_001
 Filter: notification_options ~~ ^U$
 Negate:
 OutputFormat: python
@@ -422,8 +422,8 @@ OutputFormat: python
         self.execute_and_assert(query, negate_hosts_condition)
 
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name != test_host_001
+Columns: name alias
+Filter: name != test_host_001
 Filter: alias !~~ pending_001
 Negate:2
 Filter: notification_options < d
@@ -434,8 +434,8 @@ OutputFormat: python
         self.execute_and_assert(query, expected_result)
 
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name != test_host_001
+Columns: name alias
+Filter: name != test_host_001
 Filter: alias !~~ pending_001
 Negate:2
 Filter: notification_options < d
@@ -994,8 +994,8 @@ OutputFormat: python"""
         Tests result count limitting
         """
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~ test_host_00[0-9]
+Columns: name alias
+Filter: name ~ test_host_00[0-9]
 OutputFormat: python
 """
 
@@ -1007,8 +1007,8 @@ OutputFormat: python
         self.execute_and_assert(query, assert_len)
 
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~ test_host_00[0-9]
+Columns: name alias
+Filter: name ~ test_host_00[0-9]
 Limit: 5
 OutputFormat: python
 """
@@ -1025,8 +1025,8 @@ OutputFormat: python
         Tests limitting results what's authorized to authenticated user
         """
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~ test_host_00[0-9]
+Columns: name alias
+Filter: name ~ test_host_00[0-9]
 OutputFormat: python
 """
 
@@ -1038,8 +1038,8 @@ OutputFormat: python
         self.execute_and_assert(query, assert_no_authuser)
 
         query = """GET hosts
-Columns: host_name alias
-Filter: host_name ~ test_host_00[0-9]
+Columns: name alias
+Filter: name ~ test_host_00[0-9]
 AuthUser: test_contact_02
 OutputFormat: python
 """
@@ -1063,8 +1063,8 @@ OutputFormat: python
         self.update_broker()
 
         query = """GET hosts
-Columns: host_name num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
-Filter: host_name = test_host_005
+Columns: name num_services num_services_ok num_services_hard_ok num_services_warn num_services_hard_warn num_services_crit num_services_hard_crit num_services_unknown num_services_hard_unknown worst_service_state worst_service_hard_state
+Filter: name = test_host_005
 OutputFormat: python
 """
 
@@ -1089,7 +1089,7 @@ OutputFormat: python
 
     def test_host_all_attrs(self):
         query = """GET hosts
-Filter: host_name = test_host_005
+Filter: name = test_host_005
 OutputFormat: python
 """
 
@@ -1244,7 +1244,7 @@ OutputFormat: python
         query = """GET hostsbygroup
 Columns: name hostgroup_name hostgroup_alias
 Filter: contacts >= test_contact
-Filter: host_name = test_host_005
+Filter: name = test_host_005
 OutputFormat: python"""
 
         expected_result = [
@@ -1759,7 +1759,7 @@ ResponseHeader: fixed16
         #   servicegroup_02 via servicegroup.members
         #---------------------------------------------------------------
         request = """GET services
-Columns: host_name service_description
+Columns: host_name description
 Filter: groups >= servicegroup_01
 OutputFormat: csv
 ResponseHeader: fixed16
@@ -1841,7 +1841,7 @@ OutputFormat: csv
 
         # Get all bad services from livestatus
         request = """GET services
-Columns: host_name service_description state
+Columns: host_name description state
 ColumnHeaders: off
 OutputFormat: csv
 Filter: state != 0"""
@@ -1854,7 +1854,7 @@ Filter: state != 0"""
         # Now get the first 3 bad services from livestatus
         request = """GET services
 Limit: 3
-Columns: host_name service_description state
+Columns: host_name description state
 ColumnHeaders: off
 OutputFormat: csv
 Filter: state != 0"""
@@ -1866,7 +1866,7 @@ Filter: state != 0"""
 
         # Now check if all services are sorted when queried with a livestatus request
         request = """GET services
-Columns: host_name service_description state
+Columns: host_name description state
 ColumnHeaders: off
 OutputFormat: csv"""
         response, keepalive = self.livestatus_broker.livestatus.handle_request(request)

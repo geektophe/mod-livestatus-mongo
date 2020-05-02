@@ -226,10 +226,11 @@ class DataManager(object):
         print("Brok: %s" % brok.type)
         pprint(brok.data)
         self.cleanup_old_objects(brok.data["instance_id"])
-        self.update_hostgroup_links()
-        self.update_servicegroup_links()
+        self.update_hostgroups_links()
+        self.update_servicegroups_links()
+        self.update_contacts_links()
 
-    def update_hostgroup_links(self):
+    def update_hostgroups_links(self):
         """
         Adds the necessary attributes to to properly link hotsgroups to
         hosts, services and contacts.
@@ -291,7 +292,7 @@ class DataManager(object):
                 {"$set": {"hostgroups": list(set(hostgroups))}},
             )
 
-    def update_servicegroup_links(self):
+    def update_servicegroups_links(self):
         """
         Adds the necessary attributes to to properly link servicegroups to
         hosts, services and contacts.
@@ -349,6 +350,26 @@ class DataManager(object):
             self.db.hosts.update(
                 {"_id": hst_id},
                 {"$set": {"servicegroups": list(set(servicegroups))}},
+            )
+
+    def update_contacts_links(self):
+        """
+        Adds the necessary attributes to to properly link contacts to
+        hosts and services.
+        """
+        contacts = {}
+        for host in self.db.hosts.find(projection={"_id": 1, "contacts": 1}):
+            for contact in host.get("contacts", []):
+                contacts.setdefault(contact, {"hosts": [], "services": []})
+                contacts[contact]["hosts"].append(host["_id"])
+        for srevice in self.db.srevices.find(projection={"_id": 1, "contacts": 1}):
+            for contact in srevice.get("contacts", []):
+                contacts.setdefault(contact, {"hosts": [], "services": []})
+                contacts[contact]["srevices"].append(srevice["_id"])
+        for contact, links in contacts.items():
+            self.db.contacts.update(
+                {"_id": contact},
+                {"$set": links},
             )
 
     def cleanup_old_objects(self, instance_id):

@@ -28,7 +28,6 @@ import time
 
 from shinken.bin import VERSION
 from shinken.macroresolver import MacroResolver
-from shinken.util import get_customs_keys, get_customs_values
 from shinken.log import logger
 from shinken.misc.common import DICT_MODATTR
 from pprint import pprint
@@ -39,13 +38,13 @@ class Problem:
         self.impacts = impacts
 
 
-def modified_attributes_names(self):
-    names_list = set(),
+def modified_attributes_names(modified_attributes):
+    names_list = set()
 
     for attr in DICT_MODATTR:
-        if self.modified_attributes & DICT_MODATTR[attr].value:
-            names_list.add(DICT_MODATTR[attr].attribute),
-    return list(names_list),
+        if modified_attributes & DICT_MODATTR[attr].value:
+            names_list.add(DICT_MODATTR[attr].attribute)
+    return sorted(names_list)
 
 
 def join_with_separators(request, *args):
@@ -177,6 +176,44 @@ def linked_attr(item, table, attr, default=""):
         return obj.get(attr, default)
     else:
         return default
+
+
+def customs_names(customs):
+    """
+    Returns sorted custom variables keys
+
+    :param dict customs: The custom variables
+    :rtype: list
+    :return: The sorted custom keys
+    """
+    return sorted([k.lstrip("_") for k in customs.keys()])
+
+
+def customs_values(customs):
+    """
+    Returns sorted custom variables values
+
+    :param dict customs: The custom variables
+    :rtype: list
+    :return: The sorted custom keys
+    """
+    return [
+        v for k, v in sorted(customs.items(), key=lambda i: i[0].lstrip('_'))
+    ]
+
+
+def customs_items(customs):
+    """
+    Returns sorted custom variables items (k, v)
+
+    :param dict customs: The custom variables
+    :rtype: list
+    :return: The sorted custom keys
+    """
+    return [
+        (k.lstrip("_"), v) for k, v in
+        sorted(customs.items(), key=lambda i: i[0].lstrip('_'))
+    ]
 
 # description (optional): no need to explain this
 # prop (optional): the property of the object. If this is missing, the key is the property
@@ -314,23 +351,29 @@ livestatus_attribute_map = {
         },
         'custom_variable_names': {
             'description': 'A list of the names of all custom variables',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_names(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {}
         },
         'custom_variable_values': {
             'description': 'A list of the values of the custom variables',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_values(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {}
         },
         'custom_variables': {
             'description': 'A dictionary of the custom variables',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_items(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {}
         },
         'display_name': {
@@ -382,8 +425,11 @@ livestatus_attribute_map = {
         },
         'hard_state': {
             'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
-            'function': lambda item: 0,  #FIXME
+            'function': lambda item: item["state_id"],
             'datatype': int,
+            'filters': {
+                'attr': 'state_id'
+            }
         },
         'has_been_checked': {
             'description': 'Whether the host has already been checked (0/1)',
@@ -524,8 +570,12 @@ livestatus_attribute_map = {
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: [],  #FIXME
+            'function': lambda item: modified_attributes_names(item["modified_attributes"]),
             'datatype': list,
+            'projection': [
+                'modified_attributes'
+            ],
+            'filters': {},
         },
         'name': {
             'description': 'Host name',
@@ -702,17 +752,17 @@ livestatus_attribute_map = {
         },
         'x_3d': {
             'description': '3D-Coordinates: X',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  #FIXME
             'datatype': float,
         },
         'y_3d': {
             'description': '3D-Coordinates: Y',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  #FIXME
             'datatype': float,
         },
         'z_3d': {
             'description': '3D-Coordinates: Z',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  #FIXME
             'datatype': float,
         },
     },
@@ -894,23 +944,29 @@ livestatus_attribute_map = {
         },
         'host_custom_variables': {
             'description': 'A dictionary of the custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_items(linked_attr(item, "host", "customs", {})),
             'type': list,
-            'projection': [],
+            'projection': [
+                'host.customs',
+             ],
             'filters': {},
         },
         'host_custom_variable_names': {
             'description': 'A list of the names of all custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_names(linked_attr(item, "host", "customs", {})),
             'type': list,
-            'projection': [],
+            'projection': [
+                'host.customs',
+            ],
             'filters': {},
         },
         'host_custom_variable_values': {
             'description': 'A list of the values of the custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_values(linked_attr(item, "host", "customs", {})),
             'type': list,
-            'projection': [],
+            'projection': [
+                'host.customs',
+            ],
             'filters': {},
         },
         'host_display_name': {
@@ -1173,7 +1229,7 @@ livestatus_attribute_map = {
         },
         'host_modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
-            'function': lambda item: 0, #FIXME
+            'function': lambda item: linked_attr(item, "host", "modified_attributes", 0),
             'datatype': int,
             'filters': {
                 'attr': 'host.modified_attributes',
@@ -1181,8 +1237,11 @@ livestatus_attribute_map = {
         },
         'host_modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: modified_attributes_names(linked_attr(item, "host", "modified_attributes", 0)),
             'datatype': list,
+            'projection': [
+                'host.modified_attributes'
+            ],
             'filters': {},
         },
         'host_name': {
@@ -1619,23 +1678,29 @@ livestatus_attribute_map = {
         },
         'custom_variables': {
             'description': 'A dictionary of the custom variables',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_items(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {},
         },
         'custom_variable_names': {
             'description': 'A list of the names of all custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_names(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {},
         },
         'custom_variable_values': {
             'description': 'A list of the values of all custom variable of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_values(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {},
         },
         'description': {
@@ -1815,14 +1880,15 @@ livestatus_attribute_map = {
         },
         'modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
-            'function': lambda item: len(item["modified_attributes"]),
             'datatype': int,
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: modified_attributes_names(item["modified_attributes"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'modified_attributes',
+            ],
             'filters': {},
         },
         'next_check': {
@@ -2086,23 +2152,29 @@ livestatus_attribute_map = {
         },
         'service_custom_variables': {
             'description': 'A dictionary of the custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_items(linked_attr(item, "service", "customs", {})),
             'type': list,
-            'projection': [],
+            'projection': [
+                'service.customs',
+            ],
             'filters': {},
         },
         'service_custom_variable_names': {
             'description': 'A list of the names of all custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_names(linked_attr(item, "service", "customs", {})),
             'type': list,
-            'projection': [],
+            'projection': [
+                'service.customs',
+            ],
             'filters': {},
         },
         'service_custom_variable_values': {
             'description': 'A list of the values of the custom variables of the service',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_values(linked_attr(item, "service", "customs", {})),
             'type': list,
-            'projection': [],
+            'projection': [
+                'service.customs',
+            ],
             'filters': {},
         },
         'service_description': {
@@ -2367,9 +2439,11 @@ livestatus_attribute_map = {
         },
         'service_modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: modified_attributes_names(linked_attr(item, "service", "modified_attributes", 0)),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'host.modified_attributes'
+            ],
             'filters': {},
         },
         'service_next_check': {
@@ -2385,7 +2459,7 @@ livestatus_attribute_map = {
             'function': lambda item: linked_attr(item, "service", "next_notification", 0),
             'datatype': int,
             'filters': {
-                'attr': 'service.next_notifications',
+                'attr': 'service.next_notification',
             },
         },
         'service_notes': {
@@ -2802,23 +2876,29 @@ livestatus_attribute_map = {
         },
         'custom_variables': {
             'description': 'A dictionary of the custom variables',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_items(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {},
         },
         'custom_variable_names': {
             'description': 'A list of all custom variables of the contact',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_names(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {},
         },
         'custom_variable_values': {
             'description': 'A list of the values of all custom variables of the contact',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: customs_values(item["customs"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                'customs',
+            ],
             'filters': {},
         },
         'email': {
@@ -2853,12 +2933,18 @@ livestatus_attribute_map = {
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: modified_attributes_names(item),
+            'function': lambda item: modified_attributes_names(item["modified_attributes"]),
             'datatype': list,
+            'projection': [
+                'modified_attributes',
+            ],
+            'filters': {},
         },
         'name': {
             'description': 'The login name of the contact person',
-            'filter': 'contact_name',
+            'filters': {
+                'attr': 'contact_name',
+            },
         },
         'pager': {
             'description': 'The pager address of the contact',
