@@ -10,7 +10,8 @@ for filename in \
 	test_authuser.py \
 	test_cross_collection_query.py \
 	test_modified_attributes.py \
-	test_modified_attributes.py
+	test_modified_attributes.py \
+	test_problems.py
 do
 	echo "==============================================================================="
 	echo "|"

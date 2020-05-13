@@ -97,7 +97,6 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
-        self.db.hosts
         # Manages some brok format curiosities
         # Hostgroups transformation into list
         hg = brok.data.get("hostgroups")
@@ -386,7 +385,8 @@ class DataManager(object):
             "hosts",
             "servicegroups",
             "services",
-            "timeperiods"
+            "timeperiods",
+            "problems"
         ]
         instance_version = self.instances[instance_id]
         for name in collections:
@@ -534,15 +534,6 @@ class DataManager(object):
             else:
                 data[name] = self.normalize(value)
 
-        # Manages downtimes
-        if object_type in ("host", "service"):
-            if "comments" in data:
-                self.add_comments(data, "downtimes")
-                self.cleanup_comments(data, "comments")
-            if "downtimes" in data:
-                self.add_comments(data, "comments")
-                self.cleanup_comments(data, "downtimes")
-
         # Insert brok into database
         # Services are particular because their name is a combination of
         # host_name and service_description
@@ -554,6 +545,17 @@ class DataManager(object):
         else:
             object_name = data["%s_name" % object_type]
         data["_id"] = object_name
+
+        # Manages downtimes, comments and problems
+        if object_type in ("host", "service"):
+            if "comments" in data:
+                self.add_comments(data, "downtimes")
+                self.cleanup_comments(data, "comments")
+            if "downtimes" in data:
+                self.add_comments(data, "comments")
+                self.cleanup_comments(data, "downtimes")
+            if "is_problem" in data:
+                self.add_problems(data)
 
 #        if brok.data.get("host_name") == "test_host_005":
 #            if "host" in brok.type:
@@ -617,6 +619,7 @@ class DataManager(object):
         Cleans up no more referenced comment or downtime objects
 
         :param dict data: The brok data
+        :param str kind: Is this a comment or a downtime ?
         :rtype: dict
         :retun: The modified data
         """
@@ -639,6 +642,42 @@ class DataManager(object):
             query["_id"] = {"$nin": data[kind]}
         collection.delete_many(query)
         return data
+
+    def add_problems(self, data):
+        """
+        Add separate problem from object data
+
+        :param dict data: The brok data
+        :rtype: dict
+        :retun: The modified data
+        """
+        if "service_description" in data:
+            source = (
+                data["host_name"],
+                data["service_description"]
+            )
+        else:
+            source = data["_id"]
+        if data["is_problem"] is True:
+            problem = {
+                "_id": data["_id"],
+                "source": source,
+                "impacts": sorted(
+                    data["impacts"]["hosts"] + data["impacts"]["services"]
+                ),
+                "contacts": data["contacts"],
+                "instance_id": data["instance_id"],
+                "instance_version": data["instance_version"],
+            }
+            self.db.problems.update(
+                {"_id": data["_id"]},
+                {"$set": problem},
+                upsert=True
+            )
+        else:
+            self.db.problems.delete_one(
+                {"_id": data["_id"]}
+            )
 
     def make_stack(self):
         """

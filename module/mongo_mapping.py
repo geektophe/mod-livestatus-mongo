@@ -348,7 +348,9 @@ livestatus_attribute_map = {
         },
         'child_dependencies': {
             'description': 'List of the host/service that depend on this host (logical, network or business one).',
+            'function': lambda item: item["child_dependencies"]["hosts"] + item["child_dependencies"]["services"],
             'datatype': list,
+            'filters': {},
         },
         'childs': {
             'description': 'A list of all direct childs of the host',
