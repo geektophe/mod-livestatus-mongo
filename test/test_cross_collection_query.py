@@ -30,11 +30,14 @@ import os
 import sys
 import time
 import random
+import logging
 
 from shinken_test import unittest
 
 from shinken_modules import TestConfig
 from shinken.comment import Comment
+from shinken.log import logger
+logger.setLevel(logging.DEBUG)
 
 from mock_livestatus import mock_livestatus_handle_request
 from livestatus.mongo_mapping import table_class_map
@@ -158,13 +161,130 @@ OutputFormat: python
         expected_result = [['test_host_005', 'flap_005', 0, 1, 'UP']]
         self.execute_and_assert(query, expected_result)
 
-        host = self.sched.hosts.find_by_name("test_host_005")
-        self.scheduler_loop(1, [[host, 1, 'DOWN']])
-        self.update_broker()
+        query = """GET services
+Columns: host_name host_num_services host_num_services_crit host_num_services_hard_crit host_num_services_hard_ok host_num_services_hard_unknown host_num_services_hard_warn host_num_services_ok host_num_services_pending host_num_services_unknown host_num_services_warn host_worst_service_state host_worst_service_hard_state
+Filter: host_name = test_host_005
+Filter: description = test_ok_00
+OutputFormat: python
+"""
 
-        expected_result = [['test_host_005', 'flap_005', 1, 0, 'DOWN']]
+        expected_result = [['test_host_005', 20, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0]]
         self.execute_and_assert(query, expected_result)
 
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_02")
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_warning_13")
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_03")
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_critical_11")
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_unknown_08")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_random_06")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_flap_09")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.scheduler_loop(2, [[svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C']])
+        self.update_broker()
+
+        expected_result = [['test_host_005', 20, 1, 2, 13, 1, 2, 0, 0, 0, 0, 2, 2]]
+        self.execute_and_assert(query, expected_result)
+
+        query = """GET services
+Columns: host_services
+Filter: host_name = test_host_005
+Filter: description = test_ok_00
+OutputFormat: python
+"""
+
+        expected_result = [
+            'test_ok_05',
+            'test_ok_10',
+            'test_random_06',
+            'test_ok_14',
+            'test_warning_13',
+            'test_ok_01',
+            'test_ok_04',
+            'test_ok_12',
+            'test_random_03',
+            'test_pending_17',
+            'test_ok_07',
+            'test_warning_02',
+            'test_critical_11',
+            'test_ok_16',
+            'test_ok_19',
+            'test_ok_00',
+            'test_ok_15',
+            'test_unknown_08',
+            'test_pending_18',
+            'test_flap_09'
+        ]
+
+        def assert_host_services(result):
+            self.assertEqual(len(result[0][0]), 20)
+            for s in expected_result:
+                self.assertIn(s, result[0][0])
+
+        self.execute_and_assert(query, assert_host_services)
+
+        query = """GET services
+Columns: host_services_with_info
+Filter: host_name = test_host_005
+Filter: description = test_ok_00
+OutputFormat: python
+"""
+
+        expected_result = [
+            ('test_ok_05', 0, 1, 'OK'),
+            ('test_ok_10', 0, 1, 'OK'),
+            ('test_random_06', 2, 1, 'C'),
+            ('test_ok_14', 0, 1, 'OK'),
+            ('test_warning_13', 1, 1, 'W'),
+            ('test_ok_01', 0, 1, 'OK'),
+            ('test_ok_04', 0, 1, 'OK'),
+            ('test_ok_12', 0, 1, 'OK'),
+            ('test_random_03', 1, 1, 'W'),
+            ('test_pending_17', 0, 1, 'OK'),
+            ('test_ok_07', 0, 1, 'OK'),
+            ('test_warning_02', 1, 1, 'W'),
+            ('test_critical_11', 2, 1, 'C'),
+            ('test_ok_16', 0, 1, 'OK'),
+            ('test_ok_19', 0, 1, 'OK'),
+            ('test_ok_00', 0, 1, 'OK'),
+            ('test_ok_15', 0, 1, 'OK'),
+            ('test_unknown_08', 3, 1, 'U'),
+            ('test_pending_18', 0, 1, 'OK'),
+            ('test_flap_09', 2, 1, 'C')
+        ]
+
+        self.execute_and_assert(query, assert_host_services)
+
+        query = """GET services
+Columns: host_services_with_state
+Filter: host_name = test_host_005
+Filter: description = test_ok_00
+OutputFormat: python
+"""
+
+        expected_result = [
+            ('test_ok_05', 0, 1),
+            ('test_ok_10', 0, 1),
+            ('test_random_06', 2, 1),
+            ('test_ok_14', 0, 1),
+            ('test_warning_13', 1, 1),
+            ('test_ok_01', 0, 1),
+            ('test_ok_04', 0, 1),
+            ('test_ok_12', 0, 1),
+            ('test_random_03', 1, 1),
+            ('test_pending_17', 0, 1),
+            ('test_ok_07', 0, 1),
+            ('test_warning_02', 1, 1),
+            ('test_critical_11', 2, 1),
+            ('test_ok_16', 0, 1),
+            ('test_ok_19', 0, 1),
+            ('test_ok_00', 0, 1),
+            ('test_ok_15', 0, 1),
+            ('test_unknown_08', 3, 1),
+            ('test_pending_18', 0, 1),
+            ('test_flap_09', 2, 1)
+        ]
+
+        self.execute_and_assert(query, assert_host_services)
 
     def test_cross_collections_hostgroups(self):
         self.print_header()

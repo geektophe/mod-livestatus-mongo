@@ -8,7 +8,9 @@ for filename in \
 	test_stats.py \
 	test_limit.py \
 	test_authuser.py \
-	test_cross_collection_query.py
+	test_cross_collection_query.py \
+	test_modified_attributes.py \
+	test_modified_attributes.py
 do
 	echo "==============================================================================="
 	echo "|"
