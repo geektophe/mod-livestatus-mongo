@@ -43,12 +43,6 @@ def register_datamgr(instance):
     datamgr = instance
 
 
-class Problem:
-    def __init__(self, source, impacts):
-        self.source = source
-        self.impacts = impacts
-
-
 def modified_attributes_names(modified_attributes):
     names_list = set()
 
@@ -56,39 +50,6 @@ def modified_attributes_names(modified_attributes):
         if modified_attributes & DICT_MODATTR[attr].value:
             names_list.add(DICT_MODATTR[attr].attribute)
     return sorted(names_list)
-
-
-def join_with_separators(request, *args):
-    if request.response.outputformat == 'csv':
-        try:
-            return request.response.separators.pipe.join([str(arg) for arg in args]),
-        except Exception, e:
-            logger.error("[Livestatus Broker Mapping] Bang Error: %s" % e),
-    elif request.response.outputformat == 'json' or request.response.outputformat == 'python':
-        return args
-    else:
-        return None
-    pass
-
-
-def find_pnp_perfdata_xml(name, request):
-    """Check if a pnp xml file exists for a given host or service name."""
-    if request.pnp_path_readable:
-        if '/' in name:
-            # It is a service
-
-            # replace space, colon, slash and backslash to be PNP compliant
-            name = name.split('/', 1),
-            name[1] = re.sub(r'[ :\/\\]', '_', name[1]),
-
-            if os.access(request.pnp_path + '/' + '/'.join(name) + '.xml', os.R_OK):
-                return 1
-        else:
-            # It is a host
-            if os.access(request.pnp_path + '/' + name + '/_HOST_.xml', os.R_OK):
-                return 1
-    # If in doubt, there is no pnp file
-    return 0
 
 
 def state_count(item, table, state_type_id=None, state_id=None):
@@ -744,7 +705,7 @@ livestatus_attribute_map = {
         },
         'pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this host (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: False, # Distributed service, pnp graph data not available
             'datatype': bool,
             'projection': [],
             'filters': {},
@@ -1562,7 +1523,7 @@ livestatus_attribute_map = {
         },
         'host_pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this host (0/1)',
-            'function': lambda item: 0, #FIXME
+            'function': lambda item: False, # Distributed service, pnp graph data not available
             'datatype': int,
             'projection': [],
             'filters': {},
@@ -2066,7 +2027,7 @@ livestatus_attribute_map = {
         },
         'notes_url_expanded': {
             'description': 'The notes_url with (the most important) macros expanded',
-            'function': lambda item: MacroResolver().resolve_simple_macros_in_string(item.notes_url, item.get_data_for_checks()),
+            'function': lambda item: '', #FIXME
         },
         'notification_interval': {
             'description': 'Interval of periodic notification or 0 if its off',
@@ -2110,7 +2071,7 @@ livestatus_attribute_map = {
         },
         'pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this service (0/1)',
-            'function': lambda item: find_pnp_perfdata_xml(item.get_full_name(), req),
+            'function': lambda item: False, # Distributed service, pnp graph data not available
             'datatype': int,
         },
         'poller_tag': {
@@ -2691,7 +2652,7 @@ livestatus_attribute_map = {
         },
         'service_pnpgraph_present': {
             'description': 'Whether there is a PNP4Nagios graph present for this service (0/1)',
-            'function': lambda item: 0, #FIXME
+            'function': lambda item: False, # Distributed service, pnp graph data not available
             'datatype': int,
             'projection': [],
             'filters': {},
