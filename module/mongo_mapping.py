@@ -220,22 +220,53 @@ def customs_items(customs):
     ]
 
 
-def services_with_state(services):
+def hosts_with_state(hosts):
+    """
+    Returns a list of hosts and their state
+
+    :param list hosts: The list of hosts
+    :rtype: list
+    :return: The list of services with info
+    """
+    return sorted([
+            (
+                h["host_name"],
+                h["state_id"],
+                h["has_been_checked"],
+            )
+            for h in hosts
+        ], key=lambda i: i[0])
+
+
+def services_with_state(services, with_host_name=False):
     """
     Returns a list of services and their state
 
     :param list services: The list of services
+    :param bool with_host_name: Should the host name be displayed
     :rtype: list
     :return: The list of services with info
     """
-    return [
-        (
-            s["service_description"],
-            s["state_id"],
-            s["has_been_checked"],
-        )
-        for s in services
-    ]
+    if with_host_name is False:
+        return sorted([
+                (
+                    s["service_description"],
+                    s["state_id"],
+                    s["has_been_checked"],
+                )
+                for s in services
+            ], key=lambda i: i[0])
+    else:
+        return sorted([
+                (
+                    s["host_name"],
+                    s["service_description"],
+                    s["state_id"],
+                    s["has_been_checked"],
+                )
+                for s in services
+            ], key=lambda i: "%s/%s" % i[:2])
+
 
 def services_with_info(services):
     """
@@ -246,15 +277,16 @@ def services_with_info(services):
     :return: The list of services with info
 
     """
-    return [
-        (
-            s["service_description"],
-            s["state_id"],
-            s["has_been_checked"],
-            s["output"],
-        )
-        for s in services
-    ]
+    return sorted([
+            (
+                s["service_description"],
+                s["state_id"],
+                s["has_been_checked"],
+                s["output"],
+            )
+            for s in services
+        ], key=lambda i: i[0])
+
 
 # description (optional): no need to explain this
 # prop (optional): the property of the object. If this is missing, the key is the property
@@ -1626,9 +1658,11 @@ livestatus_attribute_map = {
         },
         'host_total_services': {
             'description': 'The total number of services of the host',
-            'function': lambda item: 0, #FIXME
+            'function': lambda item: len(linked_attr(item, "host", "services", [])),
             'datatype': int,
-            'projection': [],
+            'projection': [
+                '__host__.services',
+            ],
             'filters': {},
         },
         'host_worst_service_hard_state': {
@@ -2428,7 +2462,7 @@ livestatus_attribute_map = {
         },
         'service_is_executing': {
             'description': 'is there a service check currently running... (0/1)',
-            'function': lambda item: False,  #FIXME # value in scheduler is not real-time
+            'function': lambda item: False,  #FIXME value in scheduler is not real-time
             'datatype': bool,
             'projection': [],
             'filters': {},
@@ -2910,9 +2944,14 @@ livestatus_attribute_map = {
         },
         'members_with_state': {
             'description': 'A list of all host names that are members of the hostgroup together with state and has_been_checked',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: hosts_with_state(item["__hosts__"]),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                '__hosts__.host_name',
+                '__hosts__.state_id',
+                '__hosts__.state_type_id',
+                '__hosts__.has_been_checked',
+            ],
             'filters': {},
         },
         'name': {
@@ -2941,9 +2980,15 @@ livestatus_attribute_map = {
         },
         'members_with_state': {
             'description': 'A list of all members of the service group with state and has_been_checked',
-            'function': lambda item: [], #FIXME
+            'function': lambda item: services_with_state(item["__services__"], with_host_name=True),
             'datatype': list,
-            'projection': [],
+            'projection': [
+                '__services__.host_name',
+                '__services__.service_description',
+                '__services__.state_id',
+                '__services__.state_type_id',
+                '__services__.has_been_checked',
+            ],
             'filters': {},
         },
         'name': {
