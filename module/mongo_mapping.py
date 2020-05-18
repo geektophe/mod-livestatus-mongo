@@ -32,6 +32,17 @@ from shinken.log import logger
 from shinken.misc.common import DICT_MODATTR
 from pprint import pprint
 
+datamgr = None
+
+
+def register_datamgr(instance):
+    """
+    Registers the datamgr instance
+    """
+    global datamgr
+    datamgr = instance
+
+
 class Problem:
     def __init__(self, source, impacts):
         self.source = source
@@ -93,39 +104,34 @@ def state_count(item, table, state_type_id=None, state_id=None):
     :return: The number of matching services
     """
     link = "__%s__" % table
-    try:
-        if state_type_id is not None and state_id is not None:
-            if isinstance(state_id, int):
-                return len([
-                    s for s in item[link]
-                    if s["state_type_id"] == state_type_id
-                    and s["state_id"] == state_id
-                ])
-            else:
-                return len([
-                    s for s in item[link]
-                    if s["state_type_id"] == state_type_id
-                    and s["state"] == state
-                ])
-        elif state_type_id is not None:
+    if state_type_id is not None and state_id is not None:
+        if isinstance(state_id, int):
             return len([
-                s for s in item[link] if s["state_type_id"] == state_id
+                s for s in item[link]
+                if s["state_type_id"] == state_type_id
+                and s["state_id"] == state_id
             ])
-        elif state_id is not None:
-            if isinstance(state_id, int):
-                return len([
-                    s for s in item[link] if s["state_id"] == state_id
-                ])
-            else:
-                return len([
-                    s for s in item[link] if s["state"] == state_id
-                ])
         else:
-            return len(item[link])
-    except:
-        print("state_count():")
-        pprint(item)
-        raise
+            return len([
+                s for s in item[link]
+                if s["state_type_id"] == state_type_id
+                and s["state"] == state
+            ])
+    elif state_type_id is not None:
+        return len([
+            s for s in item[link] if s["state_type_id"] == state_id
+        ])
+    elif state_id is not None:
+        if isinstance(state_id, int):
+            return len([
+                s for s in item[link] if s["state_id"] == state_id
+            ])
+        else:
+            return len([
+                s for s in item[link] if s["state"] == state_id
+            ])
+    else:
+        return len(item[link])
 
 
 def state_worst(item, table, state_type_id=None):
@@ -140,28 +146,23 @@ def state_worst(item, table, state_type_id=None):
     :return: The worst service state id
     """
     link = "__%s__" % table
-    try:
-        if state_type_id is not None:
-            states = [
-                s["state_id"] for s in item[link]
-                if s["state_type_id"] == state_type_id
-            ]
-        else:
-            states = [
-                s["state_id"] for s in item[link]
-            ]
-        if table.endswith("services") and 2 in states:
-            return 2
-        elif table.endswith("hosts") and 1 in states:
-            return 1
-        elif not states:
-            return 0
-        else:
-            return max(states)
-    except:
-        print("state_worst():")
-        pprint(item)
-        raise
+    if state_type_id is not None:
+        states = [
+            s["state_id"] for s in item[link]
+            if s["state_type_id"] == state_type_id
+        ]
+    else:
+        states = [
+            s["state_id"] for s in item[link]
+        ]
+    if table.endswith("services") and 2 in states:
+        return 2
+    elif table.endswith("hosts") and 1 in states:
+        return 1
+    elif not states:
+        return 0
+    else:
+        return max(states)
 
 
 def linked_attr(item, table, attr, default=""):
@@ -508,16 +509,20 @@ livestatus_attribute_map = {
         },
         'in_check_period': {
             'description': 'Whether this host is currently in its check period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(item["check_period"]),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                'check_period',
+            ],
             'filters': {},
         },
         'in_notification_period': {
             'description': 'Whether this host is currently in its notification period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(item["notification_period"]),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                'notification_period',
+            ],
             'filters': {},
         },
         'initial_state': {
@@ -1132,16 +1137,20 @@ livestatus_attribute_map = {
         },
         'host_in_check_period': {
             'description': 'Whether this host is currently in its check period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "host", "check_period")),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                '__host__.check_period'
+            ],
             'filters': {},
         },
         'host_in_notification_period': {
             'description': 'Whether this host is currently in its notification period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "host", "notification_period")),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                '__host__.check_period'
+            ],
             'filters': {},
         },
         'host_initial_state': {
@@ -1880,16 +1889,20 @@ livestatus_attribute_map = {
         },
         'in_check_period': {
             'description': 'Whether the service is currently in its check period (0/1)',
-            'function': lambda tem: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(item["check_period"]),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                'check_period',
+            ],
             'filters': {},
         },
         'in_notification_period': {
             'description': 'Whether the service is currently in its notification period (0/1)',
-            'function': lambda tem: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(item["notification_period"]),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                'notification_period',
+            ],
             'filters': {},
         },
         'initial_state': {
@@ -2390,16 +2403,20 @@ livestatus_attribute_map = {
         },
         'service_in_check_period': {
             'description': 'Whether this service is currently in its check period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "service", "check_period")),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                '__service__.check_period',
+            ],
             'filters': {},
         },
         'service_in_notification_period': {
             'description': 'Whether this service is currently in its notification period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "service", "notification_period")),
             'datatype': bool,
-            'projection': [],
+            'projection': [
+                '__service__.notification_period',
+            ],
             'filters': {},
         },
         'service_initial_state': {
@@ -3014,15 +3031,21 @@ livestatus_attribute_map = {
         },
         'in_host_notification_period': {
             'description': 'Whether the contact is currently in his/her host notification period (0/1)',
-            'function': lambda item: False, #FIXME
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "host", "check_period")),
             'datatype': bool,
-            'projection': [],
+            'filters': {
+                'attr': '__host__.notification_period',
+            },
             'filters': {},
         },
         'in_service_notification_period': {
             'description': 'Whether the contact is currently in his/her service notification period (0/1)',
-            'function': lambda item: (item.service_notification_period is None and [False] or [item.service_notification_period.is_time_valid(req.tic)])[0],
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "host", "notification_period")),
             'datatype': bool,
+            'filters': {
+                'attr': '__host__.notification_period',
+            },
+            'filters': {},
         },
         'modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',

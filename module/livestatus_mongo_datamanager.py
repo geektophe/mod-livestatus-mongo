@@ -26,8 +26,9 @@
 from shinken.util import safe_print
 from shinken.misc.sorter import hst_srv_sort, last_state_change_earlier
 from shinken.misc.filter import only_related_to
-from mongo_mapping import table_class_map
+from mongo_mapping import table_class_map, register_datamgr
 from livestatus_query_error import LiveStatusQueryError
+from livestatus_timeperiod import timeperiods
 from pprint import pprint
 import pymongo
 import time
@@ -49,6 +50,8 @@ class DataManager(object):
             return obj.get_full_name()
         elif hasattr(obj, "get_name"):
             return obj.get_name()
+        elif hasattr(obj, "weekdays"):
+            return self.normalize_daterange(obj)
         elif isinstance(obj, list):
             return [self.normalize(o) for o in obj]
         elif isinstance(obj, dict):
@@ -64,6 +67,30 @@ class DataManager(object):
             ])
         else:
             return obj
+
+    def normalize_daterange(self, obj):
+        """
+        Normalizes a Daterange object
+        """
+        daterange = {"timeranges": []}
+        for attr in ("syear", "smon", "smday", "swday", "swday_offset",
+                "eyear", "emon", "emday", "ewday", "ewday_offset",
+                "skip_interval", "other", "day"):
+            if hasattr(obj, attr):
+                val = getattr(obj, attr)
+                if not isinstance(val, int) and val.isdigit():
+                     val = int(val)
+                daterange[attr] = val
+        for dtr in obj.timeranges:
+            daterange["timeranges"].append(
+                {
+                    "hstart": dtr.hstart,
+                    "mstart": dtr.mstart,
+                    "hend": dtr.hend,
+                    "mend": dtr.mend
+                }
+            )
+        return daterange
 
     def manage_brok(self, brok):
         """
@@ -81,6 +108,7 @@ class DataManager(object):
         pprint(brok.data)
         instance_id = brok.data["instance_id"]
         self.instances[instance_id] = int(time.time())
+        timeperiods.clear()
 
     def manage_program_status_brok(self, brok):
         """
@@ -529,10 +557,7 @@ class DataManager(object):
             "instance_version": self.instances[brok.data["instance_id"]]
         }
         for name, value in brok.data.items():
-            if name == "dateranges":
-                continue
-            else:
-                data[name] = self.normalize(value)
+            data[name] = self.normalize(value)
 
         # Insert brok into database
         # Services are particular because their name is a combination of
@@ -557,25 +582,13 @@ class DataManager(object):
             if "is_problem" in data:
                 self.add_problems(data)
 
-#        if brok.data.get("host_name") == "test_host_005":
-#            if "host" in brok.type:
-#                print("*************************************")
-#                print("Brok type: %s" % brok.type)
-#                pprint(data)
-#                print("*************************************")
-#            elif "service" in brok.type and \
-#                    brok.data.get("service_description") == "test_ok_00":
-#                print("*************************************")
-#                print("Brok type: %s" % brok.type)
-#                pprint(data)
-#                print("*************************************")
-
         collection = getattr(self.db, "%ss" % object_type)
         collection.update(
             {"_id": object_name},
             {"$set": data},
             upsert=True
         )
+        return data
 
     def add_comments(self, data, kind):
         """
@@ -2106,6 +2119,32 @@ class DataManager(object):
         collection = self.get_collection(table)
         return collection.aggregate(query)
 
+    def is_timeperiod_active(self, timeperiod_name):
+        """
+        Checks if a timeperiod is currently active or not
+
+        :param str timeperiod_name: The timeperiod name
+        :rtype: bool
+        :return: The timeperiod active flag
+        """
+        if timeperiod_name not in timeperiods:
+            timeperiod = self.db.timeperiods.find_one({"_id": timeperiod_name})
+            if timeperiod is None:
+                raise LiveStatusQueryError(
+                    452,
+                    "unknown timeperiod %s" % timeperiod_name
+                )
+            timeperiods.add_timeperiod(timeperiod)
+            for exclude_name in timeperiod["exclude"]:
+                timeperiod = self.db.timeperiods.find_one({"_id": exclude_name})
+                if timeperiod is None:
+                    raise LiveStatusQueryError(
+                        452,
+                        "unknown timeperiod %s" % exclude_name
+                    )
+                timeperiods.add_timeperiod(timeperiod)
+        return timeperiods.is_active(timeperiod_name)
+
     # UI will launch us names in str, we got unicode
     # in our rg, so we must manage it here
     def get_host(self, hname):
@@ -2442,3 +2481,4 @@ class DataManager(object):
         return r
 
 datamgr = DataManager()
+register_datamgr(datamgr)

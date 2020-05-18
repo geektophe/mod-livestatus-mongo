@@ -11,7 +11,8 @@ for filename in \
 	test_cross_collection_query.py \
 	test_modified_attributes.py \
 	test_modified_attributes.py \
-	test_problems.py
+	test_problems.py \
+	test_timeperiods.py
 do
 	echo "==============================================================================="
 	echo "|"

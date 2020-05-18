@@ -208,7 +208,9 @@ class LiveStatusQuery(object):
                 _, self.limit = self.split_option(line)
             elif keyword == 'AuthUser':
                 _, authuser = self.split_option(line)
-                if self.table in ['hosts', 'services', 'hostgroups', 'servicegroups', 'hostsbygroup', 'servicesbygroup', 'servicesbyhostgroup', 'problems']:
+                if self.table in ['hosts', 'services', 'hostgroups',
+                        'servicegroups', 'hostsbygroup', 'servicesbygroup',
+                        'servicesbyhostgroup', 'problems']:
                     self.datamgr.add_filter_user(
                         self.filters_stack,
                         "contacts",

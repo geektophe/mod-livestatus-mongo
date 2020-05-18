@@ -29,6 +29,7 @@ from collections import namedtuple
 import csv
 import json
 from StringIO import StringIO
+import traceback
 
 try:
     from ujson import dumps, loads
@@ -217,8 +218,9 @@ class LiveStatusResponse(object):
                     value = item.get(attr, "")
                 row.append(value)
             except Exception as e:
+                logger.debug(traceback.format_exc())
                 raise LiveStatusQueryError(
-                    450,
+                    500,
                     "failed to map value %s/%s: %s" %
                     (self.query.table, column, e)
                 )
