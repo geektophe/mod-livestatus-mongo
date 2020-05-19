@@ -2825,7 +2825,6 @@ livestatus_attribute_map = {
                 '__services__.state_type_id'
             ],
             'filters': {},
-            'datatype': int,
         },
     },
     'HostsLink': {
@@ -2833,6 +2832,7 @@ livestatus_attribute_map = {
             'description': 'The total number of hosts in the group',
             'function': lambda item: len(item["__hosts__"]),
             'projection': ["__hosts__.host_name"],
+            'filters': {},
         },
         'num_hosts_down': {
             'description': 'The number of hosts in the group that are down',
@@ -2895,9 +2895,6 @@ livestatus_attribute_map = {
         },
         'alias': {
             'description': 'An alias of the hostgroup',
-        },
-        'hostgroup_name': {
-            'description': 'Name of the hostgroup',
         },
         'members': {
             'description': 'A list of all host names that are members of the hostgroup',
@@ -2991,9 +2988,6 @@ livestatus_attribute_map = {
             'description': 'Whether the contact is allowed to submit commands (0/1)',
             'datatype': bool,
         },
-        'contact_name': {
-            'description': 'The login name of the contact person',
-        },
         'custom_variables': {
             'description': 'A dictionary of the custom variables',
             'function': lambda item: customs_items(item["customs"]),
@@ -3037,19 +3031,19 @@ livestatus_attribute_map = {
         },
         'in_host_notification_period': {
             'description': 'Whether the contact is currently in his/her host notification period (0/1)',
-            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "host", "check_period")),
+            'function': lambda item: datamgr.is_timeperiod_active(item["host_notification_period"]),
             'datatype': bool,
             'filters': {
-                'attr': '__host__.notification_period',
+                'attr': 'host_notification_period',
             },
             'filters': {},
         },
         'in_service_notification_period': {
             'description': 'Whether the contact is currently in his/her service notification period (0/1)',
-            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "host", "notification_period")),
+            'function': lambda item: datamgr.is_timeperiod_active(item["service_notification_period"]),
             'datatype': bool,
             'filters': {
-                'attr': '__host__.notification_period',
+                'attr': '__service__.notification_period',
             },
             'filters': {},
         },

@@ -44,6 +44,66 @@ class DataManager(object):
 
     def load(self, db):
         self.db = db
+        self.create_indexes()
+
+    def create_indexes(self):
+        """
+        Creates the necessary indexes to speed up queries
+        """
+        # Hosts indexes
+        self.db.hosts.create_index("host_name", background=True)
+        self.db.hosts.create_index("hostgroups", background=True)
+        self.db.hosts.create_index("servicegroups", background=True)
+        self.db.hosts.create_index("contacts", background=True)
+        self.db.hosts.create_index("problem_has_been_acknowledged", background=True)
+        self.db.hosts.create_index("active_checks_enabled", background=True)
+        self.db.hosts.create_index("passive_checks_enabled", background=True)
+        self.db.hosts.create_index("scheduled_downtime_depth", background=True)
+
+        # Services indexes
+        self.db.services.create_index("host_name", background=True)
+        self.db.services.create_index("service_description", background=True)
+        self.db.services.create_index("hostgroups", background=True)
+        self.db.services.create_index("servicegroups", background=True)
+        self.db.services.create_index("contacts", background=True)
+        self.db.services.create_index("problem_has_been_acknowledged", background=True)
+        self.db.services.create_index("active_checks_enabled", background=True)
+        self.db.services.create_index("passive_checks_enabled", background=True)
+        self.db.services.create_index("scheduled_downtime_depth", background=True)
+
+        # Hostgroups indexes
+        self.db.hostgroups.create_index("hostgroup_name", background=True)
+
+        # Hostgroups indexes
+        self.db.servicegroups.create_index("servicegroup_name", background=True)
+
+        # Contacts indexes
+        self.db.contacts.create_index("contact_name", background=True)
+
+        # Timeperiods indexes
+        self.db.timeperiods.create_index("timeperiod_name", background=True)
+
+        # Timeperiods indexes
+        self.db.commands.create_index("command_name", background=True)
+
+        # Schedulers indexes
+        self.db.schedulerlinks.create_index("scheduler_name", background=True)
+
+        # Brokers indexes
+        self.db.brokerlinks.create_index("broker_name", background=True)
+
+        # Reactionners indexes
+        self.db.reactionnerlinks.create_index("reactionner_name", background=True)
+
+        # Pollers indexes
+        self.db.pollerlinks.create_index("poller_name", background=True)
+
+        # Downtimes indexes
+        self.db.downtimes.create_index("is_service", background=True)
+
+        # Comments indexes
+        self.db.comments.create_index("is_service", background=True)
+
 
     def normalize(self, obj):
         if hasattr(obj, "get_full_name"):
@@ -1475,9 +1535,15 @@ class DataManager(object):
         queried in mongo. Return the suitable attribute for Mongo query
         from LQL.
 
+        We distinguish attributes used as filter in a $match stage from
+        those used in non filterable $lookup statements, for performance
+        purpose.
+
+        Filterable attributes are tagged "pre", the others "post".
+
         :param str table: The table name
         :param str column: The LQL requested column
-        :rtype: str
+        :rtype: dict
         :return: The attribute name to use in mongo query
         """
         mapping = self.mapping[table][column]
@@ -1485,10 +1551,16 @@ class DataManager(object):
             "projection",
             self.get_column_attribute(table, column, False)
         )
-        if isinstance(projection, list):
-            return projection
+        # Columns with explitit null filter are used to join collections
+        # post $match
+        if "filters" in mapping and not mapping["filters"]:
+            section = "post"
         else:
-            return [projection]
+            section = "pre"
+        if isinstance(projection, list):
+            return {section: projection}
+        else:
+            return {section: [projection]}
 
     def get_mongo_columns_projection(self, table, columns):
         """
@@ -1500,15 +1572,18 @@ class DataManager(object):
         :rtype: dict
         :return: The projection dictionnary
         """
-        projection = ["_id"]
+        projection = {
+            "pre": ["_id"],
+        }
         for column in columns:
-            projection.extend(
-                self.get_mongo_column_projection(table, column)
+            col_projection = self.get_mongo_column_projection(table, column)
+            for section, attrs in col_projection.items():
+                projection.setdefault(section, []).extend(attrs)
+        for section, attrs in projection.items():
+            projection[section] = dict(
+                [(p, 1) for p in set(projection[section])]
             )
-        projection = list(set(projection))
-        return dict(
-            [(p, 1) for p in projection]
-        )
+        return projection
 
     def get_mongo_expand_hosts(self, pipeline, projection):
         """
@@ -1968,30 +2043,45 @@ class DataManager(object):
         groupby = self.grouping_tables.get(table)
 
         if groupby is not None and groupby not in projection:
-            projection[groupby] = 1
+            projection["pre"][groupby] = 1
+
+        # Builds query projection from both pre and post attributes projection
+        full_projection = {}
+        full_projection.update(projection.get("pre", {}))
+        full_projection.update(projection.get("post", {}))
 
         # Check if another collection lookup is necessary
         get_expand_fct_name = "get_mongo_expand_%s" % table
         get_expand_fct = getattr(self, get_expand_fct_name, None)
 
+        # Builds lookup cross collection links
+        # pre lookups are used to initially filter columns where a filter
+        # is allowed, post lookups are used to link other non filterable
+        # collections
+        lookup = {}
         if get_expand_fct:
-            lookup = get_expand_fct(table, projection)
-        else:
-            lookup = []
+            for section in projection:
+                stages = get_expand_fct(table, projection[section])
+                if stages:
+                    lookup[section] = stages
 
         # If another collection $lookup is necessary, use an aggregation
         # rather than a search
         if lookup or query_format == "aggregation":
-            pipeline = [
-                #{"$project": projection}
-            ]
-            pipeline.extend(lookup)
+            pipeline = []
+            # As an optimization, we dissociate projection attributes where
+            # a columns had a filter from those that only have to be displayed
+            # This allows to limit the number or link cross collections
+            pipeline.extend(lookup.get("pre", []))
             pipeline.append(
                 {"$match": query}
             )
+            pipeline.extend(lookup.get("post", []))
+            # Skip the $project stage if query_format is `aggregation` because
+            # it's done in the calling method
             if projection and query_format != "aggregation":
                 pipeline.append({
-                    "$project": projection
+                    "$project": full_projection
                 })
             if limit is not None:
                 pipeline.append(
@@ -2013,7 +2103,7 @@ class DataManager(object):
         else:
             parms = {
                 "filter": query,
-                "projection": projection,
+                "projection": full_projection,
             }
             if sort is None:
                 parms["sort"] = [("_id", pymongo.ASCENDING)]
