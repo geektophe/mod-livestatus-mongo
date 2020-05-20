@@ -47,6 +47,15 @@ class DataManager(object):
         self.db = db
         self.create_indexes()
 
+    def clear_db(self):
+        """
+        Clears the database content
+
+        Useful to reinitialize when running tests
+        """
+        for collection in self.db.collection_names():
+            self.db.drop_collection(collection)
+
     def create_indexes(self):
         """
         Creates the necessary indexes to speed up queries

@@ -82,9 +82,6 @@ class LivestatusTestBase(ShinkenTest):
     def update_broker(self, dodeepcopy=False):
         # The brok should be manage in the good order
         for brok in self.sched.brokers['Default-Broker']['broks']:
-            #print "Managing a brok type", brok.type, "of id", brok_id
-            #if brok.type == 'update_service_status':
-            #    print "Problem?", brok.data['is_problem']
             if dodeepcopy:
                 brok = copy.deepcopy(brok)
             brok.prepare()
@@ -96,13 +93,16 @@ class LivestatusTestBase(ShinkenTest):
         self.setup_with_file(self.cfg_file)
         self.testid = str(os.getpid() + random.randint(1, 1000))
         self.init_livestatus()
-        print "Cleaning old broks?"
+        if os.getenv("TEST_CLEANUP_DATABASE") == "YES":
+            print("Clearing database content")
+            self.livestatus_broker.datamgr.clear_db()
+        print("Cleaning old broks?")
         self.sched.conf.skip_initial_broks = False
         self.sched.brokers['Default-Broker'] = {'broks' : [], 'has_full_broks' : False}
         self.sched.fill_initial_broks('Default-Broker')
 
         self.update_broker()
-        print "************* Overall Setup:", time.time() - start_setUp
+        print("************* Overall Setup:", time.time() - start_setUp)
         # add use_aggressive_host_checking so we can mix exit codes 1 and 2
         # but still get DOWN state
         host = self.sched.hosts.find_by_name("test_host_000")
