@@ -41,12 +41,10 @@ class LiveStatusQuery(object):
 
     my_type = 'query'
 
-    def __init__(self, datamgr, db, pnp_path, return_queue, counters):
+    def __init__(self, datamgr, return_queue):
         # Runtime data form the global LiveStatus object
         self.datamgr = datamgr
         self.mapping = datamgr.mapping
-        self.db = db
-        self.pnp_path = pnp_path
         self.return_queue = return_queue
 
         # Private attributes for this specific request
@@ -90,6 +88,7 @@ class LiveStatusQuery(object):
             'servicesbygroup':      self.get_filtered_livedata,
             'servicesbyhostgroup':  self.get_filtered_livedata,
             'problems':             self.get_filtered_livedata,
+            'log':                  self.get_filtered_livedata,
             'status':               self.get_status_livedata,
             'columns':              self.get_columns_livedata,
         }
@@ -172,11 +171,11 @@ class LiveStatusQuery(object):
             raise LiveStatusQueryError(450, 'invalid filter: %s' % line)
 
     def parse_input(self, data):
-        """Parse the lines of a livestatus request.
+        """
+        Parse the lines of a livestatus request.
 
         This function looks for keywords in input lines and
         sets the attributes of the request object
-
         """
         for line in data.splitlines():
             line = line.strip()
@@ -225,16 +224,12 @@ class LiveStatusQuery(object):
             elif keyword == 'Filter':
                 try:
                     attribute, operator, reference = self.parse_filter_line(line)
-                    # Builds mongo filters
-                    if self.table == 'log':
-                        self.db.add_filter(operator, attribute, reference)
-                    else:
-                        self.add_filter(
-                            self.filters_stack,
-                            operator,
-                            attribute,
-                            reference
-                        )
+                    self.add_filter(
+                        self.filters_stack,
+                        operator,
+                        attribute,
+                        reference
+                    )
                 except Exception as e:
                     logger.warning("[Livestatus Query] Illegal operation: %s" % e)
                     raise
@@ -244,36 +239,27 @@ class LiveStatusQuery(object):
                 # Take the last andnum functions from the stack
                 # Construct a new function which makes a logical and
                 # Put the function back onto the stack
-                if self.table == 'log':
-                    self.db.add_filter_and(andnum)
-                else:
-                    self.datamgr.stack_filter_and(
-                        self.filters_stack,
-                        self.table,
-                        andnum
-                    )
+                self.datamgr.stack_filter_and(
+                    self.filters_stack,
+                    self.table,
+                    andnum
+                )
             elif keyword == 'Or':
                 _, ornum = self.split_option(line)
                 # Take the last ornum functions from the stack
                 # Construct a new function which makes a logical or
                 # Put the function back onto the stack
-                if self.table == 'log':
-                    self.db.add_filter_or(ornum)
-                else:
-                    self.datamgr.stack_filter_or(
-                        self.filters_stack,
-                        self.table,
-                        ornum
-                    )
+                self.datamgr.stack_filter_or(
+                    self.filters_stack,
+                    self.table,
+                    ornum
+                )
             elif keyword == 'Negate':
                 _, notnum = self.split_option(line)
-                if self.table == 'log':
-                    self.db.add_filter_not()
-                else:
-                    self.datamgr.stack_filter_negate(
-                        self.filters_stack,
-                        notnum
-                    )
+                self.datamgr.stack_filter_negate(
+                    self.filters_stack,
+                    notnum
+                )
             elif keyword == 'Stats':
                 self.stats_query = True
                 try:
@@ -338,16 +324,7 @@ class LiveStatusQuery(object):
         try:
             # Remember the number of stats filters. We need these numbers as columns later.
             # But we need to ask now, because get_live_data() will empty the stack
-            if self.table == 'log':
-                return self.get_live_data_log(cs)
-            else:
-                # If the pnpgraph_present column is involved, then check
-                # with each request if the pnp perfdata path exists
-                #if 'pnpgraph_present' in self.columns + self.filtercolumns + self.prefiltercolumns and self.pnp_path and os.access(self.pnp_path, os.R_OK):
-                #    self.pnp_path_readable = True
-                #else:
-                #    self.pnp_path_readable = False
-                return self.get_live_data()
+            return self.get_live_data()
         except Exception, e:
             import traceback
             logger.error("[Livestatus Query] Error: %s" % e)
@@ -590,22 +567,6 @@ class LiveStatusQuery(object):
             return []
 
         return handler()
-
-    def _get_live_data_log(self, cs):
-        for x in self.db.get_live_data_log():
-            z = x.fill(self.datamgr)
-            if cs.without_filter or cs.filter_func(z):
-                yield z
-
-    def get_live_data_log(self, cs):
-        '''
-        :param cs: The `LiveStatusConstraints´ instance to use for the live data logs.
-        :return: a generator which yields logs matching the given "cs" constraints.
-        '''
-        items = self._get_live_data_log(cs)
-        if self.limit:
-            items = gen_limit(items, self.limit)
-        return items
 
     def add_filter(self, stack, operator, attribute, reference):
         """

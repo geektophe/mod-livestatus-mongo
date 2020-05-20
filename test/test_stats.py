@@ -26,66 +26,15 @@
 # This file is used to test host- and service-downtimes.
 #
 
-import os
 import sys
 import time
-import random
-
-from shinken_test import unittest
-
-from shinken_modules import TestConfig
-from shinken.comment import Comment
-
-from mock_livestatus import mock_livestatus_handle_request
+import unittest
 from pprint import pprint
-
+from livestatus_test import LivestatusTestBase
 
 sys.setcheckinterval(10000)
 
-
-
-@mock_livestatus_handle_request
-class TestConfigBig(TestConfig):
-    def setUp(self):
-        start_setUp = time.time()
-        self.setup_with_file('etc/shinken_5r_10h_200s.cfg')
-        Comment.id = 1
-        self.testid = str(os.getpid() + random.randint(1, 1000))
-        self.init_livestatus()
-        print "Cleaning old broks?"
-        self.sched.conf.skip_initial_broks = False
-        self.sched.brokers['Default-Broker'] = {'broks' : [], 'has_full_broks' : False}
-        self.sched.fill_initial_broks('Default-Broker')
-
-        self.update_broker()
-        print "************* Overall Setup:", time.time() - start_setUp
-        # add use_aggressive_host_checking so we can mix exit codes 1 and 2
-        # but still get DOWN state
-        host = self.sched.hosts.find_by_name("test_host_000")
-        host.__class__.use_aggressive_host_checking = 1
-
-    def execute_and_assert(self, query, expected_result):
-        """
-        Executes a Livestatus query, and asserts the got result is the one
-        expected.
-
-        :param str query: The query to execute
-        :param list expected_result: The result to match
-        """
-        # With memory backend
-        print("\n***")
-        print("Query:")
-        print(query)
-        response, _ = self.livestatus_broker.livestatus.handle_request(query)
-        print("Response")
-        print(response)
-        pyresponse = eval(response)
-        print("PyResponse")
-        pprint(pyresponse)
-        if callable(expected_result):
-            expected_result(pyresponse)
-        else:
-            self.assertEqual(pyresponse, expected_result)
+class LivestatusTest(LivestatusTestBase):
 
     def test_stats(self):
         self.print_header()

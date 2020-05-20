@@ -52,17 +52,11 @@ class Logline(dict):
     id = 0
     columns = ['logobject', 'attempt', 'logclass', 'command_name', 'comment', 'contact_name', 'host_name', 'lineno', 'message', 'options', 'plugin_output', 'service_description', 'state', 'state_type', 'time', 'type']
 
-    def __init__(self, sqlite_cursor=None, sqlite_row=None, line=None, srcdict=None):
+    def __init__(self, line=None, srcdict=None):
         if srcdict != None:
             for col in Logline.columns:
                 logger.info("[Livestatus Log Lines] Set %s, %s"% (col, srcdict[col]))
                 setattr(self, col, srcdict[col])
-        elif sqlite_cursor != None and sqlite_row != None:
-            for idx, col in enumerate(sqlite_cursor):
-                if col[0] == 'class':
-                    setattr(self, 'logclass', sqlite_row[idx])
-                else:
-                    setattr(self, col[0], sqlite_row[idx])
         elif line != None:
             if isinstance(line, unicode):
                 line = line.encode('UTF-8').rstrip()
@@ -225,31 +219,3 @@ class Logline(dict):
 
     def __str__(self):
         return "line: %s" % self.message
-
-
-    def fill(self, datamgr):
-        """Attach host and/or service objects to a Logline object
-
-        Lines describing host or service events only contain host_name
-        and/or service_description. This method finds the corresponding
-        objects and adds them to the line as attributes log_host
-        and/or log_service
-
-        """
-        if hasattr(self, 'logobject') and self.logobject == LOGOBJECT_HOST:
-            try:
-                setattr(self, 'log_host', datamgr.get_host(self.host_name))
-            except Exception, e:
-                logger.error("[Livestatus Log Lines] Error on host: %s" % e)
-                pass
-        elif hasattr(self, 'logobject') and self.logobject == LOGOBJECT_SERVICE:
-            try:
-                setattr(self, 'log_host', datamgr.get_host(self.host_name))
-                setattr(self, 'log_service', datamgr.get_service(self.host_name, self.service_description))
-            except Exception, e:
-                logger.error("[Livestatus Log Lines] Error on service: %s" % e)
-                pass
-        else:
-            setattr(self, 'log_host', None)
-            setattr(self, 'log_service', None)
-        return self

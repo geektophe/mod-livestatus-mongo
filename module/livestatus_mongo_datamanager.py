@@ -29,6 +29,7 @@ from shinken.misc.filter import only_related_to
 from mongo_mapping import table_class_map, register_datamgr
 from livestatus_query_error import LiveStatusQueryError
 from livestatus_timeperiod import timeperiods
+from log_line import Logline, LOGCLASS_INVALID
 from pprint import pprint
 import pymongo
 import time
@@ -596,6 +597,17 @@ class DataManager(object):
         :param Brok brok: The brok object to update object from
         """
         self.update_object("service", brok)
+
+    def manage_log_brok(self, b):
+        """
+        Processes and logs log broks.
+
+        :param Brok brok: The brok object to update object from
+        """
+        data = b.data
+        line = Logline(line=data["log"])
+        pprint(line.as_dict())
+        self.db.log.insert_one(line.as_dict())
 
     def update_object(self, object_type, brok):
         """

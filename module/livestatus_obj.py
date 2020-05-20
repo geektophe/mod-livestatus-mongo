@@ -61,11 +61,8 @@ class LiveStatus(object):
 
     """
 
-    def __init__(self, datamgr, query_cache, db, pnp_path, return_queue, counters=None):
+    def __init__(self, datamgr, return_queue, counters=None):
         self.datamgr = datamgr
-        self.query_cache = query_cache
-        self.db = db
-        self.pnp_path = pnp_path
         self.return_queue = return_queue
         if counters is None:
             counters = LiveStatusCounters()
@@ -105,8 +102,6 @@ class LiveStatus(object):
         request = LiveStatusRequest(
                 data,
                 self.datamgr,
-                self.db,
-                self.pnp_path,
                 self.return_queue,
                 self.counters)
         request.parse_input(data)

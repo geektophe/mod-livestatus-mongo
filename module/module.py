@@ -103,8 +103,6 @@ class LiveStatus_broker(BaseModule, Daemon):
     def __init__(self, modconf):
         BaseModule.__init__(self, modconf)
         # We can be in a scheduler. If so, we keep a link to it to speed up regenerator phase
-        self.scheduler = None
-        self.plugins = []
         self.host = getattr(modconf, 'host', '127.0.0.1')
         if self.host == '*':
             self.host = '0.0.0.0'
@@ -123,13 +121,9 @@ class LiveStatus_broker(BaseModule, Daemon):
             logger.warning("[Livestatus Broker] Warning: the list of allowed hosts is invalid. %s" % str(ips))
             logger.warning("[Livestatus Broker] Warning: the list of allowed hosts is invalid. %s" % str(self.allowed_hosts))
             raise
-        self.pnp_path = getattr(modconf, 'pnp_path', '')
         self.debug = getattr(modconf, 'debug', None)
         self.debug_queries = (getattr(modconf, 'debug_queries', '0') == '1')
         self.use_query_cache = (getattr(modconf, 'query_cache', '0') == '1')
-        self.transparent_update = (
-            getattr(modconf, 'transparent_update', '0') == '1'
-        )
         if getattr(modconf, 'service_authorization', 'loose') == 'strict':
             self.service_authorization_strict = True
         else:
@@ -141,48 +135,24 @@ class LiveStatus_broker(BaseModule, Daemon):
         self.backend = getattr(modconf, "backend", "mongo")
         self.backend_uri = getattr(modconf, "backend_uri", "mongodb://localhost")
 
-        #  This is an "artificial" module which is used when an old-style
-        #  shinken-specific.cfg without a separate logstore-module is found.
-        self.compat_sqlite = {
-            'module_name': 'LogStore',
-            'module_type': 'logstore_sqlite',
-            'use_aggressive_sql': "0",
-            'database_file': getattr(modconf, 'database_file', None),
-            'archive_path': getattr(modconf, 'archive_path', None),
-            'max_logs_age': getattr(modconf, 'max_logs_age', None),
-        }
         # We need to have our regenerator now because it will need to load
         # data from scheduler before main() if in scheduler of course
         self.rg = LiveStatusRegenerator(
             self.service_authorization_strict,
-            self.group_authorization_strict,
-            self.transparent_update
+            self.group_authorization_strict
         )
 
         self.client_connections = {}  # keys will be socket of client,
         # values are LiveStatusClientThread instances
 
-        self.db = None
         self.listeners = []
         self._listening_thread = threading.Thread(target=self._listening_thread_run)
-
-    def add_compatibility_sqlite_module(self):
-        if len([m for m in self.modules_manager.instances if m.properties['type'].startswith('logstore_')]) == 0:
-            #  this shinken-specific.cfg does not use the new submodules
-            for k in self.compat_sqlite.keys():
-                if self.compat_sqlite[k] == None:
-                    del self.compat_sqlite[k]
-            dbmod = Module(self.compat_sqlite)
-            self.modules_manager.set_modules([dbmod])
-            self.modules_manager.load_and_init()
-            self.modules_manager.instances[0].load(self)
 
     # Called by Broker so we can do init stuff
     # TODO: add conf param to get pass with init
     # Conf from arbiter!
     def init(self):
         logger.info("[Livestatus Broker] Init of the Livestatus '%s'" % self.name)
-        self.prepare_pnp_path()
         m = MacroResolver() # TODO: don't know/think these 2 lines are necessary..
         m.output_macros = ['HOSTOUTPUT', 'HOSTPERFDATA', 'HOSTACKAUTHOR',
                            'HOSTACKCOMMENT', 'SERVICEOUTPUT', 'SERVICEPERFDATA',
@@ -193,7 +163,7 @@ class LiveStatus_broker(BaseModule, Daemon):
             self.datamgr = datamgr
             self.mongo_client = pymongo.MongoClient(self.backend_uri)
             self.datamgr.load(self.mongo_client.livestatus)
-        elif self.backend ==  "memory":
+        elif self.backend ==  "memory" and False:
             from shinken.misc.datamanager import datamgr
             self.datamgr = datamgr
             datamgr.load(self.rg)
@@ -218,16 +188,6 @@ class LiveStatus_broker(BaseModule, Daemon):
     def want_brok(self, b):
         return self.rg.want_brok(b)
 
-    def prepare_pnp_path(self):
-        if not self.pnp_path:
-            self.pnp_path = False
-        elif not os.access(self.pnp_path, os.R_OK):
-            logger.warning("[Livestatus Broker] PNP perfdata path %s is not readable" % self.pnp_path)
-        elif not os.access(self.pnp_path, os.F_OK):
-            logger.warning("[Livestatus Broker] PNP perfdata path %s does not exist" % self.pnp_path)
-        if self.pnp_path and not self.pnp_path.endswith('/'):
-            self.pnp_path += '/'
-
     def set_debug(self):
         fdtemp = os.open(self.debug, os.O_CREAT | os.O_WRONLY | os.O_APPEND)
         ## We close out and err
@@ -244,20 +204,9 @@ class LiveStatus_broker(BaseModule, Daemon):
         # Daemon like init
         self.debug_output = []
 
-        self.modules_manager = ModulesManager('livestatus', self.find_modules_path(), [])
-        self.modules_manager.set_modules(self.modules)
-        # We can now output some previously silenced debug output
-        self.do_load_modules()
-        for inst in self.modules_manager.instances:
-            if inst.properties["type"].startswith('logstore'):
-                f = getattr(inst, 'load', None)
-                if f and callable(f):
-                    f(self)
-                break
         for s in self.debug_output:
             logger.debug("[Livestatus Broker] %s" % s)
         del self.debug_output
-        self.add_compatibility_sqlite_module()
         try:
             self.do_main()
         except Exception, exp:
@@ -285,44 +234,12 @@ class LiveStatus_broker(BaseModule, Daemon):
         # I register my exit function
         self.set_exit_handler()
         logger.info("[Livestatus Broker] Go run")
-
-        # Open the logging database
-        self.db = self.modules_manager.instances[0]
-        assert isinstance(self.db, BaseModule)
-        self.db.open()
-        if hasattr(self.db, 'prepare_log_db_table'):
-            self.db.prepare_log_db_table()
-            # Immediately archive data. This also splits old-style (storing logs
-            # from more than one day) up into many single-day databases
-            if self.db.max_logs_age > 0:
-                self.db.log_db_do_archive()
-
-        self.load_plugins()
         self.main_thread_run()
-
-    # Here we will load all plugins (pages) under the webui/plugins
-    # directory. Each one can have a page, views and htdocs dir that we must
-    # route correctly
-    def load_plugins(self):
-        pass
 
     def manage_brok(self, brok):
         """We use this method mostly for the unit tests"""
         brok.prepare()
-        if self.backend == "memory":
-            self.rg.manage_brok(brok)
-        else:
-            self.datamgr.manage_brok(brok)
-
-        for mod in self.modules_manager.get_internal_instances():
-            try:
-                mod.manage_brok(brok)
-            except Exception, exp:
-                logger.debug("[Livestatus Broker] %s" % str(exp.__dict__))
-                logger.warning("[%s] The mod %s raise an exception: %s, I'm tagging it to restart later" % (self.name, mod.get_name(), str(exp)))
-                logger.debug("[%s] Exception type: %s" % (self.name, type(exp)))
-                logger.debug("Back trace of this kill: %s" % (traceback.format_exc()))
-                self.modules_manager.set_to_restart(mod)
+        self.datamgr.manage_brok(brok)
 
     def do_stop(self):
         logger.info("[Livestatus Broker] So I quit")
@@ -339,10 +256,6 @@ class LiveStatus_broker(BaseModule, Daemon):
         # inputs must be closed after listening_thread
         for s in self.listeners:
             full_safe_close(s)
-        try:
-            self.db.close()
-        except Exception as err:
-            logger.warning('Error on db close: %s' % err)
 
     def create_listeners(self):
         backlog = 5
@@ -412,22 +325,15 @@ class LiveStatus_broker(BaseModule, Daemon):
     # while updating
     def main_thread_run(self):
         logger.info("[Livestatus Broker] Livestatus query thread started")
-        self.db.open()  # make sure to open the db in this thread..
         # This is the main object of this broker where the action takes place
-        self.livestatus = LiveStatus(self.datamgr, self.query_cache, self.db, self.pnp_path, self.from_q)
+        self.livestatus = LiveStatus(self.datamgr, self.from_q)
         self.create_listeners()
         self._listening_thread.start()
-
-        db_commit_next_time = time.time()
 
         while not self.interrupted:
             now = time.time()
 
             self.livestatus.counters.calc_rate()
-
-            if db_commit_next_time < now:
-                db_commit_next_time = now + 3  # only commit every ~3 secs
-                self.db.commit_and_rotate_log_db()
 
             try:
                 l = self.to_q.get(True, 1)
