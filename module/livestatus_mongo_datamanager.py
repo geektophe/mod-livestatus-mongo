@@ -114,6 +114,12 @@ class DataManager(object):
         # Comments indexes
         self.db.comments.create_index("is_service", background=True)
 
+        # Logs indexes
+        self.db.log.create_index("host_name", background=True)
+        self.db.log.create_index("service_description", background=True)
+        self.db.log.create_index("state", background=True)
+        self.db.log.create_index("state_type", background=True)
+
 
     def normalize(self, obj):
         if hasattr(obj, "get_full_name"):
@@ -186,8 +192,17 @@ class DataManager(object):
 
         :param Brok brok: The brok object to update object from
         """
-        print("Brok: %s" % brok.type)
-        pprint(brok.data)
+        data = {
+            "instance_version": self.instances[brok.data["instance_id"]]
+        }
+        for name, value in brok.data.items():
+            data[name] = self.normalize(value)
+        self.db.status.update(
+            {"_id": data["instance_id"]},
+            {"$set": data},
+            upsert=True
+        )
+        return data
 
     def manage_initial_host_status_brok(self, brok):
         """
@@ -474,17 +489,22 @@ class DataManager(object):
         Removes previous versions of objects for a given instance
         """
         collections = [
-            "commands",
-            "comments",
-            "contactgroups",
-            "contacts",
-            "downtimes",
-            "hostgroups",
             "hosts",
-            "servicegroups",
             "services",
+            "hostgroups",
+            "servicegroups",
+            "contacts",
+            "contactgroups",
+            "comments",
+            "downtimes",
+            "commands",
             "timeperiods",
-            "problems"
+            "status",
+            "schedulers",
+            "pollers",
+            "reactionners",
+            "brokers",
+            "problems",
         ]
         instance_version = self.instances[instance_id]
         for name in collections:
@@ -615,8 +635,13 @@ class DataManager(object):
         """
         data = b.data
         line = Logline(line=data["log"])
-        pprint(line.as_dict())
-        self.db.log.insert_one(line.as_dict())
+        log = line.as_dict()
+        if log.get('service_description'):
+            log['service'] = '%s/%s' % (
+                log['host_name'],
+                log['service_description']
+            )
+        self.db.log.insert_one(log)
 
     def update_object(self, object_type, brok):
         """
@@ -1954,6 +1979,40 @@ class DataManager(object):
         # If at least one attribtue from the service is requested, add
         # the $lookup pipeline stage
         lookup = []
+        if not projection or any([p.startswith("__command__.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "commands",
+                        "localField": "command",
+                        "foreignField": "_id",
+                        "as": "__command__",
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$__command__",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
+            ])
+        if not projection or any([p.startswith("__contact__.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "contacts",
+                        "localField": "contact",
+                        "foreignField": "_id",
+                        "as": "__contact__",
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$__contact__",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
+            ])
         if not projection or any([p.startswith("__host__.") for p in projection]):
             lookup.extend([
                 {
@@ -2035,6 +2094,81 @@ class DataManager(object):
                     }
                 }
             ])
+        return lookup
+
+    def get_mongo_expand_log(self, pipeline, projection):
+        """
+        Adds cross collections $lookup stage to the pipeline if columns
+        require access to child objects attributes.
+
+        :param list pipeline: The mongo pipeline to update
+        :param list projection: The
+        """
+        # If at least one attribtue from the service is requested, add
+        # the $lookup pipeline stage
+        lookup = []
+        if not projection or any([p.startswith("__host__.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "hosts",
+                        "localField": "host_name",
+                        "foreignField": "_id",
+                        "as": "__host__",
+                    },
+                },
+                {
+                    "$unwind": {
+                        "path": "$__host__",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
+            ])
+        if not projection or any([p.startswith("__service__.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "services",
+                        "localField": "service",
+                        "foreignField": "_id",
+                        "as": "__service__",
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$__service__",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
+                ])
+        if not projection or any([p.startswith("__contact__.") for p in projection]):
+            lookup.extend([
+                {
+                    "$lookup": {
+                        "from": "contacts",
+                        "localField": "contact_name",
+                        "foreignField": "_id",
+                        "as": "__contact__",
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$__contact__",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                }
+            ])
+        if not projection or any([p.startswith("__host_services__.") for p in projection]):
+            lookup.append(
+                {
+                    "$lookup": {
+                        "from": "services",
+                        "localField": "host_name",
+                        "foreignField": "host_name",
+                        "as": "__host_services__",
+                    }
+                }
+            )
         return lookup
 
     def get_filter_query(self, table, stack, columns=None, limit=None, sort=None, query_format=None):
@@ -2230,7 +2364,7 @@ class DataManager(object):
         collection = self.get_collection(table)
         return collection.aggregate(query)
 
-    def is_timeperiod_active(self, timeperiod_name):
+    def is_timeperiod_active(self, timeperiod_name, raise_error=True):
         """
         Checks if a timeperiod is currently active or not
 
@@ -2241,18 +2375,24 @@ class DataManager(object):
         if timeperiod_name not in timeperiods:
             timeperiod = self.db.timeperiods.find_one({"_id": timeperiod_name})
             if timeperiod is None:
-                raise LiveStatusQueryError(
-                    452,
-                    "unknown timeperiod %s" % timeperiod_name
-                )
+                if raise_error is True:
+                    raise LiveStatusQueryError(
+                        452,
+                        "unknown timeperiod %s" % timeperiod_name
+                    )
+                else:
+                    return False
             timeperiods.add_timeperiod(timeperiod)
             for exclude_name in timeperiod["exclude"]:
                 timeperiod = self.db.timeperiods.find_one({"_id": exclude_name})
-                if timeperiod is None:
-                    raise LiveStatusQueryError(
-                        452,
-                        "unknown timeperiod %s" % exclude_name
-                    )
+                if raise_error is True:
+                    if timeperiod is None:
+                        raise LiveStatusQueryError(
+                            452,
+                            "unknown exclude timeperiod %s" % exclude_name
+                        )
+                else:
+                    return False
                 timeperiods.add_timeperiod(timeperiod)
         return timeperiods.is_active(timeperiod_name)
 

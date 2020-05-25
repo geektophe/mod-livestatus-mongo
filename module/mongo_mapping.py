@@ -610,7 +610,7 @@ livestatus_attribute_map = {
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: modified_attributes_names(item["modified_attributes"]),
+            'function': lambda item: modified_attributes_names(item.get("modified_attributes", 0)),
             'datatype': list,
             'projection': [
                 'modified_attributes'
@@ -1992,7 +1992,7 @@ livestatus_attribute_map = {
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: modified_attributes_names(item["modified_attributes"]),
+            'function': lambda item: modified_attributes_names(item.get("modified_attributes", 0)),
             'datatype': list,
             'projection': [
                 'modified_attributes',
@@ -2398,7 +2398,7 @@ livestatus_attribute_map = {
         },
         'service_in_check_period': {
             'description': 'Whether this service is currently in its check period (0/1)',
-            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "service", "check_period")),
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "service", "check_period"), raise_error=False),
             'datatype': bool,
             'projection': [
                 '__service__.check_period',
@@ -2407,7 +2407,7 @@ livestatus_attribute_map = {
         },
         'service_in_notification_period': {
             'description': 'Whether this service is currently in its notification period (0/1)',
-            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "service", "notification_period")),
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "service", "notification_period"), raise_error=False),
             'datatype': bool,
             'projection': [
                 '__service__.notification_period',
@@ -2540,7 +2540,7 @@ livestatus_attribute_map = {
         },
         'service_modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
-            'function': lambda item: len(linked_attr(item, "service", "modified_attributes", 0)),
+            'function': lambda item: linked_attr(item, "service", "modified_attributes", 0),
             'datatype': int,
             'filters': {
                 'attr': '__service__.modified_attributes',
@@ -2551,7 +2551,7 @@ livestatus_attribute_map = {
             'function': lambda item: modified_attributes_names(linked_attr(item, "service", "modified_attributes", 0)),
             'datatype': list,
             'projection': [
-                '__host__.modified_attributes'
+                '__service__.modified_attributes'
             ],
             'filters': {},
         },
@@ -3042,10 +3042,9 @@ livestatus_attribute_map = {
             'description': 'Whether the contact is currently in his/her service notification period (0/1)',
             'function': lambda item: datamgr.is_timeperiod_active(item["service_notification_period"]),
             'datatype': bool,
-            'filters': {
-                'attr': '__service__.notification_period',
+            'projection': {
+                'service_notification_period',
             },
-            'filters': {},
         },
         'modified_attributes': {
             'description': 'A bitmask specifying which attributes have been modified',
@@ -3053,7 +3052,7 @@ livestatus_attribute_map = {
         },
         'modified_attributes_list': {
             'description': 'A list of all modified attributes',
-            'function': lambda item: modified_attributes_names(item["modified_attributes"]),
+            'function': lambda item: modified_attributes_names(item.get("modified_attributes", 0)),
             'datatype': list,
             'projection': [
                 'modified_attributes',
@@ -3079,6 +3078,202 @@ livestatus_attribute_map = {
         'service_notifications_enabled': {
             'description': 'Whether the contact will be notified about service problems in general (0/1)',
             'datatype': bool,
+        },
+
+    },
+    'ContactLink': {
+        'contact_address1': {
+            'description': 'The additional field address1',
+            'function': lambda item: linked_attr(item, "contact", "address1"),
+            'projection': [
+                '__contact__.address1'
+            ],
+            'filters': {},
+        },
+        'contact_address2': {
+            'description': 'The additional field address2',
+            'function': lambda item: linked_attr(item, "contact", "address2"),
+            'projection': [
+                '__contact__.address2'
+            ],
+            'filters': {},
+        },
+        'contact_address3': {
+            'description': 'The additional field address3',
+            'function': lambda item: linked_attr(item, "contact", "address3"),
+            'projection': [
+                '__contact__.address3'
+            ],
+            'filters': {},
+        },
+        'contact_address4': {
+            'description': 'The additional field address4',
+            'function': lambda item: linked_attr(item, "contact", "address4"),
+            'projection': [
+                '__contact__.address4'
+            ],
+            'filters': {},
+        },
+        'contact_address5': {
+            'description': 'The additional field address5',
+            'function': lambda item: linked_attr(item, "contact", "address5"),
+            'projection': [
+                '__contact__.address5'
+            ],
+            'filters': {},
+        },
+        'contact_address6': {
+            'description': 'The additional field address6',
+            'function': lambda item: linked_attr(item, "contact", "address6"),
+            'projection': [
+                '__contact__.address6'
+            ],
+            'filters': {},
+        },
+        'contact_alias': {
+            'description': 'The full name of the contact',
+            'function': lambda item: linked_attr(item, "contact", "alias"),
+            'projection': [
+                '__contact__.alias'
+            ],
+            'filters': {},
+        },
+        'contact_can_submit_commands': {
+            'description': 'Whether the contact is allowed to submit commands (0/1)',
+            'function': lambda item: linked_attr(item, "contact", "can_submit_commands"),
+            'datatype': bool,
+            'projection': [
+                '__contact__.can_submit_commands'
+            ],
+            'filters': {},
+        },
+        'contact_custom_variables': {
+            'description': 'A dictionary of the custom variables',
+            'function': lambda item: customs_items(linked_attr(item, "contact", "customs", {})),
+            'datatype': list,
+            'projection': [
+                '__contact__.customs',
+            ],
+            'filters': {},
+        },
+        'contact_custom_variable_names': {
+            'description': 'A list of all custom variables of the contact',
+            'function': lambda item: customs_names(linked_attr(item, "contact", "customs", {})),
+            'datatype': list,
+            'projection': [
+                '__contact__.customs',
+            ],
+            'filters': {},
+        },
+        'contact_custom_variable_values': {
+            'description': 'A list of the values of all custom variables of the contact',
+            'function': lambda item: customs_values(linked_attr(item, "contact", "customs", {})),
+            'datatype': list,
+            'projection': [
+                '__contact__.customs',
+            ],
+            'filters': {},
+        },
+        'contact_email': {
+            'description': 'The email address of the contact',
+            'function': lambda item: linked_attr(item, "contact", "email"),
+            'projection': [
+                '__contact__.email'
+            ],
+            'filters': {},
+        },
+        'contact_host_notification_period': {
+            'description': 'The time period in which the contact will be notified about host problems',
+            'function': lambda item: linked_attr(item, "contact", "host_notification_period"),
+            'projection': [
+                '__contact__.host_notification_period'
+            ],
+            'filters': {},
+        },
+        'contact_host_notifications_enabled': {
+            'description': 'Whether the contact will be notified about host problems in general (0/1)',
+            'function': lambda item: linked_attr(item, "contact", "host_notifications_enabled"),
+            'datatype': bool,
+            'projection': [
+                '__contact__.host_notifications_enabled'
+            ],
+            'filters': {},
+        },
+        'contact_host_notification_options': {
+            'description': 'The options controlling when host notification should be sent to the contact',
+            'function': lambda item: linked_attr(item, "contact", "host_notifications_options"),
+            'datatype': list,
+            'projection': [
+                '__contact__.host_notifications_options'
+            ],
+            'filters': {},
+        },
+        'contact_in_host_notification_period': {
+            'description': 'Whether the contact is currently in his/her host notification period (0/1)',
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "contact", "host_notification_period"), raise_error=False),
+            'datatype': bool,
+            'projection': [
+                '__contact__.host_notification_period',
+                ],
+            'filters': {},
+        },
+        'contact_in_service_notification_period': {
+            'description': 'Whether the contact is currently in his/her service notification period (0/1)',
+            'function': lambda item: datamgr.is_timeperiod_active(linked_attr(item, "contact", "service_notification_period"), raise_error=False),
+            'datatype': bool,
+            'projection': [
+                '__contact__.service_notification_period',
+                ],
+            'filters': {},
+        },
+        'contact_modified_attributes': {
+            'description': 'A bitmask specifying which attributes have been modified',
+            'datatype': int,
+            'function': lambda item: linked_attr(item, "contact", "modified_attributes", 0),
+            'projection': [
+                '__contact__.modified_attributes'
+            ],
+            'filters': {},
+        },
+        'contact_modified_attributes_list': {
+            'description': 'A list of all modified attributes',
+            'function': lambda item: modified_attributes_names(linked_attr(item, "contact", "modified_attributes", 0)),
+            'datatype': list,
+            'projection': [
+                '__contact__.modified_attributes',
+            ],
+            'filters': {},
+        },
+        'contact_pager': {
+            'description': 'The pager address of the contact',
+            'function': lambda item: linked_attr(item, "contact", "pager"),
+            'projection': [
+                '__contact__.pager'
+            ],
+            'filters': {},
+        },
+        'contact_service_notification_options': {
+            'description': 'The options controlling when service notification should be sent to the contact',
+            'function': lambda item: linked_attr(item, "contact", "service_notification_options"),
+            'datatype': list,
+            'projection': [
+                '__contact__.service_notification_options'
+            ],
+        },
+        'contact_service_notification_period': {
+            'description': 'The time period in which the contact will be notified about service problems',
+            'function': lambda item: linked_attr(item, "contact", "service_notification_period"),
+            'projection': [
+                '__contact__.service_notification_period'
+            ],
+        },
+        'contact_service_notifications_enabled': {
+            'description': 'Whether the contact will be notified about service problems in general (0/1)',
+            'function': lambda item: linked_attr(item, "contact", "service_notifications_enabled"),
+            'datatype': bool,
+            'projection': [
+                '__contact__.service_notifications_enabled'
+            ],
         },
 
     },
@@ -3119,12 +3314,6 @@ livestatus_attribute_map = {
         },
     },
     'Command': {
-        'command_name': {
-            'description': 'The name of the command',
-        },
-        'command_line': {
-            'description': 'The shell command line',
-        },
         'line': {
             'description': 'The shell command line',
             'filters': {
@@ -3136,6 +3325,16 @@ livestatus_attribute_map = {
             'filters': {
                 'attr': 'command_name',
             },
+        },
+    },
+    'CommandLink': {
+        'command_line': {
+            'description': 'The shell command line',
+            'function': lambda item: linked_attr(item, "command", "command_line"),
+            'projection': [
+                '__command__.command_line',
+            ],
+            'filters': {}
         },
     },
     'SchedulerLink': {
@@ -4206,622 +4405,23 @@ livestatus_attribute_map = {
         'contact_name': {
             'description': 'The name of the contact the log entry is about (might be empty)',
         },
-        'current_command_line': {
-            'description': 'The shell command line',
-            'function': lambda item: "",  # REPAIRME
-        },
         'current_command_name': {
             'description': 'The name of the command',
-            'function': lambda item: "",  # REPAIRME
-        },
-        'current_contact_address1': {
-            'description': 'The additional field address1',
-        },
-        'current_contact_address2': {
-            'description': 'The additional field address2',
-        },
-        'current_contact_address3': {
-            'description': 'The additional field address3',
-        },
-        'current_contact_address4': {
-            'description': 'The additional field address4',
-        },
-        'current_contact_address5': {
-            'description': 'The additional field address5',
-        },
-        'current_contact_address6': {
-            'description': 'The additional field address6',
-        },
-        'current_contact_alias': {
-            'description': 'The full name of the contact',
-        },
-        'current_contact_can_submit_commands': {
-            'description': 'Whether the contact is allowed to submit commands (0/1)',
-        },
-        'current_contact_custom_variable_names': {
-            'description': 'A list of all custom variables of the contact',
-        },
-        'current_contact_custom_variable_values': {
-            'description': 'A list of the values of all custom variables of the contact',
-        },
-        'current_contact_custom_variables': {
-            'description': 'A dictionary of the custom variables',
-        },
-        'current_contact_email': {
-            'description': 'The email address of the contact',
-        },
-        'current_contact_host_notification_period': {
-            'description': 'The time period in which the contact will be notified about host problems',
-        },
-        'current_contact_host_notifications_enabled': {
-            'description': 'Whether the contact will be notified about host problems in general (0/1)',
-        },
-        'current_contact_in_host_notification_period': {
-            'description': 'Whether the contact is currently in his/her host notification period (0/1)',
-        },
-        'current_contact_in_service_notification_period': {
-            'description': 'Whether the contact is currently in his/her service notification period (0/1)',
-        },
-        'current_contact_modified_attributes': {
-            'description': 'A bitmask specifying which attributes have been modified',
-        },
-        'current_contact_modified_attributes_list': {
-            'description': 'A list of all modified attributes',
-        },
-        'current_contact_name': {
-            'description': 'The login name of the contact person',
-        },
-        'current_contact_pager': {
-            'description': 'The pager address of the contact',
-        },
-        'current_contact_service_notification_period': {
-            'description': 'The time period in which the contact will be notified about service problems',
-        },
-        'current_contact_service_notifications_enabled': {
-            'description': 'Whether the contact will be notified about service problems in general (0/1)',
-        },
-        'current_host_accept_passive_checks': {
-            'description': 'Whether passive host checks are accepted (0/1)',
-        },
-        'current_host_acknowledged': {
-            'description': 'Whether the current host problem has been acknowledged (0/1)',
-        },
-        'current_host_acknowledgement_type': {
-            'description': 'Type of acknowledgement (0: none, 1: normal, 2: stick)',
-        },
-        'current_host_action_url': {
-            'description': 'An optional URL to custom actions or information about this host',
-        },
-        'current_host_action_url_expanded': {
-            'description': 'The same as action_url, but with the most important macros expanded',
-        },
-        'current_host_active_checks_enabled': {
-            'description': 'Whether active checks are enabled for the host (0/1)',
-        },
-        'current_host_address': {
-            'description': 'IP address',
-        },
-        'current_host_alias': {
-            'description': 'An alias name for the host',
-        },
-        'current_host_check_command': {
-            'description': 'Nagios command for active host check of this host',
-        },
-        'current_host_check_flapping_recovery_notification': {
-            'description': 'Whether to check to send a recovery notification when flapping stops (0/1)',
-        },
-        'current_host_check_freshness': {
-            'description': 'Whether freshness checks are activated (0/1)',
-        },
-        'current_host_check_interval': {
-            'description': 'Number of basic interval lengths between two scheduled checks of the host',
-        },
-        'current_host_check_options': {
-            'description': 'The current check option, forced, normal, freshness... (0-2)',
-        },
-        'current_host_check_period': {
-            'description': 'Time period in which this host will be checked. If empty then the host will always be checked.',
-        },
-        'current_host_check_type': {
-            'description': 'Type of check (0: active, 1: passive)',
-        },
-        'current_host_checks_enabled': {
-            'description': 'Whether checks of the host are enabled (0/1)',
-        },
-        'current_host_childs': {
-            'description': 'A list of all direct childs of the host',
-        },
-        'current_host_comments': {
-            'description': 'A list of the ids of all comments of this host',
-        },
-        'current_host_comments_with_info': {
-            'description': 'A list of all comments of the host with id, author and comment',
-        },
-        'current_host_contact_groups': {
-            'description': 'A list of all contact groups this host is in',
-        },
-        'current_host_contacts': {
-            'description': 'A list of all contacts of this host, either direct or via a contact group',
-        },
-        'current_host_current_attempt': {
-            'description': 'Number of the current check attempts',
-        },
-        'current_host_current_notification_number': {
-            'description': 'Number of the current notification',
-        },
-        'current_host_custom_variable_names': {
-            'description': 'A list of the names of all custom variables',
-        },
-        'current_host_custom_variable_values': {
-            'description': 'A list of the values of the custom variables',
-        },
-        'current_host_custom_variables': {
-            'description': 'A dictionary of the custom variables',
-        },
-        'current_host_display_name': {
-            'description': 'Optional display name of the host - not used by Nagios\' web interface',
-        },
-        'current_host_downtimes': {
-            'description': 'A list of the ids of all scheduled downtimes of this host',
-        },
-        'current_host_downtimes_with_info': {
-            'description': 'A list of the all scheduled downtimes of the host with id, author and comment',
-        },
-        'current_host_event_handler_enabled': {
-            'description': 'Whether event handling is enabled (0/1)',
-        },
-        'current_host_execution_time': {
-            'description': 'Time the host check needed for execution',
-        },
-        'current_host_filename': {
-            'description': 'The value of the custom variable FILENAME',
-        },
-        'current_host_first_notification_delay': {
-            'description': 'Delay before the first notification',
-        },
-        'current_host_flap_detection_enabled': {
-            'description': 'Whether flap detection is enabled (0/1)',
-        },
-        'current_host_groups': {
-            'description': 'A list of all host groups this host is in',
-        },
-        'current_host_hard_state': {
-            'description': 'The effective hard state of the host (eliminates a problem in hard_state)',
-        },
-        'current_host_has_been_checked': {
-            'description': 'Whether the host has already been checked (0/1)',
-        },
-        'current_host_high_flap_threshold': {
-            'description': 'High threshold of flap detection',
-        },
-        'current_host_icon_image': {
-            'description': 'The name of an image file to be used in the web pages',
-        },
-        'current_host_icon_image_alt': {
-            'description': 'Alternative text for the icon_image',
-        },
-        'current_host_icon_image_expanded': {
-            'description': 'The same as icon_image, but with the most important macros expanded',
-        },
-        'current_host_in_check_period': {
-            'description': 'Whether this host is currently in its check period (0/1)',
-        },
-        'current_host_in_notification_period': {
-            'description': 'Whether this host is currently in its notification period (0/1)',
-        },
-        'current_host_initial_state': {
-            'description': 'Initial host state',
-        },
-        'current_host_is_executing': {
-            'description': 'is there a host check currently running... (0/1)',
-        },
-        'current_host_is_flapping': {
-            'description': 'Whether the host state is flapping (0/1)',
-        },
-        'current_host_last_check': {
-            'description': 'Time of the last check (Unix timestamp)',
-        },
-        'current_host_last_hard_state': {
-            'description': 'Last hard state',
-        },
-        'current_host_last_hard_state_change': {
-            'description': 'Time of the last hard state change (Unix timestamp)',
-        },
-        'current_host_last_notification': {
-            'description': 'Time of the last notification (Unix timestamp)',
-        },
-        'current_host_last_state': {
-            'description': 'State before last state change',
-        },
-        'current_host_last_state_change': {
-            'description': 'Time of the last state change - soft or hard (Unix timestamp)',
-        },
-        'current_host_last_time_down': {
-            'description': 'The last time the host was DOWN (Unix timestamp)',
-        },
-        'current_host_last_time_unreachable': {
-            'description': 'The last time the host was UNREACHABLE (Unix timestamp)',
-        },
-        'current_host_last_time_up': {
-            'description': 'The last time the host was UP (Unix timestamp)',
-        },
-        'current_host_latency': {
-            'description': 'Time difference between scheduled check time and actual check time',
-        },
-        'current_host_long_plugin_output': {
-            'description': 'Complete output from check plugin',
-        },
-        'current_host_low_flap_threshold': {
-            'description': 'Low threshold of flap detection',
-        },
-        'current_host_max_check_attempts': {
-            'description': 'Max check attempts for active host checks',
-        },
-        'current_host_modified_attributes': {
-            'description': 'A bitmask specifying which attributes have been modified',
-        },
-        'current_host_modified_attributes_list': {
-            'description': 'A list of all modified attributes',
+            'filters': {
+                'attr': 'command_name'
+            }
         },
         'current_host_name': {
             'description': 'Host name',
-        },
-        'current_host_next_check': {
-            'description': 'Scheduled time for the next check (Unix timestamp)',
-        },
-        'current_host_next_notification': {
-            'description': 'Time of the next notification (Unix timestamp)',
-        },
-        'current_host_no_more_notifications': {
-            'description': 'Whether to stop sending notifications (0/1)',
-        },
-        'current_host_notes': {
-            'description': 'Optional notes for this host',
-        },
-        'current_host_notes_expanded': {
-            'description': 'The same as notes, but with the most important macros expanded',
-        },
-        'current_host_notes_url': {
-            'description': 'An optional URL with further information about the host',
-        },
-        'current_host_notes_url_expanded': {
-            'description': 'Same es notes_url, but with the most important macros expanded',
-        },
-        'current_host_notification_interval': {
-            'description': 'Interval of periodic notification or 0 if its off',
-        },
-        'current_host_notification_period': {
-            'description': 'Time period in which problems of this host will be notified. If empty then notification will be always',
-        },
-        'current_host_notifications_enabled': {
-            'description': 'Whether notifications of the host are enabled (0/1)',
-        },
-        'current_host_num_services': {
-            'description': 'The total number of services of the host',
-        },
-        'current_host_num_services_crit': {
-            'description': 'The number of the host\'s services with the soft state CRIT',
-        },
-        'current_host_num_services_hard_crit': {
-            'description': 'The number of the host\'s services with the hard state CRIT',
-        },
-        'current_host_num_services_hard_ok': {
-            'description': 'The number of the host\'s services with the hard state OK',
-        },
-        'current_host_num_services_hard_unknown': {
-            'description': 'The number of the host\'s services with the hard state UNKNOWN',
-        },
-        'current_host_num_services_hard_warn': {
-            'description': 'The number of the host\'s services with the hard state WARN',
-        },
-        'current_host_num_services_ok': {
-            'description': 'The number of the host\'s services with the soft state OK',
-        },
-        'current_host_num_services_pending': {
-            'description': 'The number of the host\'s services which have not been checked yet (pending)',
-        },
-        'current_host_num_services_unknown': {
-            'description': 'The number of the host\'s services with the soft state UNKNOWN',
-        },
-        'current_host_num_services_warn': {
-            'description': 'The number of the host\'s services with the soft state WARN',
-        },
-        'current_host_obsess_over_host': {
-            'description': 'The current obsess_over_host setting... (0/1)',
-        },
-        'current_host_parents': {
-            'description': 'A list of all direct parents of the host',
-        },
-        'current_host_pending_flex_downtime': {
-            'description': 'Whether a flex downtime is pending (0/1)',
-        },
-        'current_host_percent_state_change': {
-            'description': 'Percent state change',
-        },
-        'current_host_perf_data': {
-            'description': 'Optional performance data of the last host check',
-        },
-        'current_host_plugin_output': {
-            'description': 'Output of the last host check',
-        },
-        'current_host_pnpgraph_present': {
-            'description': 'Whether there is a PNP4Nagios graph present for this host (0/1)',
-        },
-        'current_host_process_performance_data': {
-            'description': 'Whether processing of performance data is enabled (0/1)',
-        },
-        'current_host_retry_interval': {
-            'description': 'Number of basic interval lengths between checks when retrying after a soft error',
-        },
-        'current_host_scheduled_downtime_depth': {
-            'description': 'The number of downtimes this host is currently in',
-        },
-        'current_host_services_with_info': {
-            'description': 'A list of all services including detailed information about each service',
-        },
-        'current_host_services': {
-            'description': 'A list of all services of the host',
-        },
-        'current_host_services_with_state': {
-            'description': 'A list of all services of the host together with state and has_been_checked',
-        },
-        'current_host_state': {
-            'description': 'The current state of the host (0: up, 1: down, 2: unreachable)',
-        },
-        'current_host_state_type': {
-            'description': 'Type of the current state (0: soft, 1: hard)',
-        },
-        'current_host_statusmap_image': {
-            'description': 'The name of in image file for the status map',
-        },
-        'current_host_total_services': {
-            'description': 'The total number of services of the host',
-        },
-        'current_host_worst_service_hard_state': {
-            'description': 'The worst hard state of all of the host\'s services (OK <= WARN <= UNKNOWN <= CRIT)',
-        },
-        'current_host_worst_service_state': {
-            'description': 'The worst soft state of all of the host\'s services (OK <= WARN <= UNKNOWN <= CRIT)',
-        },
-        'current_host_x_3d': {
-            'description': '3D-Coordinates: X',
-        },
-        'current_host_y_3d': {
-            'description': '3D-Coordinates: Y',
-        },
-        'current_host_z_3d': {
-            'description': '3D-Coordinates: Z',
-        },
-        'current_service_accept_passive_checks': {
-            'description': 'Whether the service accepts passive checks (0/1)',
-        },
-        'current_service_acknowledged': {
-            'description': 'Whether the current service problem has been acknowledged (0/1)',
-        },
-        'current_service_acknowledgement_type': {
-            'description': 'The type of the acknownledgement (0: none, 1: normal, 2: sticky)',
-        },
-        'current_service_action_url': {
-            'description': 'An optional URL for actions or custom information about the service',
-        },
-        'current_service_action_url_expanded': {
-            'description': 'The action_url with (the most important) macros expanded',
-        },
-        'current_service_active_checks_enabled': {
-            'description': 'Whether active checks are enabled for the service (0/1)',
-        },
-        'current_service_check_command': {
-            'description': 'Nagios command used for active checks',
-        },
-        'current_service_check_interval': {
-            'description': 'Number of basic interval lengths between two scheduled checks of the service',
-        },
-        'current_service_check_options': {
-            'description': 'The current check option, forced, normal, freshness... (0/1)',
-        },
-        'current_service_check_period': {
-            'description': 'The name of the check period of the service. It this is empty, the service is always checked.',
-        },
-        'current_service_check_type': {
-            'description': 'The type of the last check (0: active, 1: passive)',
-        },
-        'current_service_checks_enabled': {
-            'description': 'Whether active checks are enabled for the service (0/1)',
-        },
-        'current_service_comments': {
-            'description': 'A list of all comment ids of the service',
-        },
-        'current_service_comments_with_info': {
-            'description': 'A list of all comments of the service with id, author and comment',
-        },
-        'current_service_contact_groups': {
-            'description': 'A list of all contact groups this service is in',
-        },
-        'current_service_contacts': {
-            'description': 'A list of all contacts of the service, either direct or via a contact group',
-        },
-        'current_service_current_attempt': {
-            'description': 'The number of the current check attempt',
-        },
-        'current_service_current_notification_number': {
-            'description': 'The number of the current notification',
-        },
-        'current_service_custom_variable_names': {
-            'description': 'A list of the names of all custom variables of the service',
-        },
-        'current_service_custom_variables': {
-            'description': 'A dictionary of the custom variables',
-        },
-        'current_service_custom_variable_values': {
-            'description': 'A list of the values of all custom variable of the service',
+            'filters': {
+                'attr': 'host_name'
+            }
         },
         'current_service_description': {
             'description': 'Description of the service (also used as key)',
-        },
-        'current_service_display_name': {
-            'description': 'An optional display name (not used by Nagios standard web pages)',
-        },
-        'current_service_downtimes': {
-            'description': 'A list of all downtime ids of the service',
-        },
-        'current_service_downtimes_with_info': {
-            'description': 'A list of all downtimes of the service with id, author and comment',
-        },
-        'current_service_event_handler': {
-            'description': 'Nagios command used as event handler',
-        },
-        'current_service_event_handler_enabled': {
-            'description': 'Whether and event handler is activated for the service (0/1)',
-        },
-        'current_service_execution_time': {
-            'description': 'Time the host check needed for execution',
-        },
-        'current_service_first_notification_delay': {
-            'description': 'Delay before the first notification',
-        },
-        'current_service_flap_detection_enabled': {
-            'description': 'Whether flap detection is enabled for the service (0/1)',
-        },
-        'current_service_groups': {
-            'description': 'A list of all service groups the service is in',
-        },
-        'current_service_has_been_checked': {
-            'description': 'Whether the service already has been checked (0/1)',
-        },
-        'current_service_high_flap_threshold': {
-            'description': 'High threshold of flap detection',
-        },
-        'current_service_icon_image': {
-            'description': 'The name of an image to be used as icon in the web interface',
-        },
-        'current_service_icon_image_alt': {
-            'description': 'An alternative text for the icon_image for browsers not displaying icons',
-        },
-        'current_service_icon_image_expanded': {
-            'description': 'The icon_image with (the most important) macros expanded',
-        },
-        'current_service_in_check_period': {
-            'description': 'Whether the service is currently in its check period (0/1)',
-        },
-        'current_service_in_notification_period': {
-            'description': 'Whether the service is currently in its notification period (0/1)',
-        },
-        'current_service_initial_state': {
-            'description': 'The initial state of the service',
-        },
-        'current_service_is_executing': {
-            'description': 'is there a service check currently running... (0/1)',
-        },
-        'current_service_is_flapping': {
-            'description': 'Whether the service is flapping (0/1)',
-        },
-        'current_service_last_check': {
-            'description': 'The time of the last check (Unix timestamp)',
-        },
-        'current_service_last_hard_state': {
-            'description': 'The last hard state of the service',
-        },
-        'current_service_last_hard_state_change': {
-            'description': 'The time of the last hard state change (Unix timestamp)',
-        },
-        'current_service_last_notification': {
-            'description': 'The time of the last notification (Unix timestamp)',
-        },
-        'current_service_last_state': {
-            'description': 'The last state of the service',
-        },
-        'current_service_last_state_change': {
-            'description': 'The time of the last state change (Unix timestamp)',
-        },
-        'current_service_last_time_critical': {
-            'description': 'The last time the service was CRITICAL (Unix timestamp)',
-        },
-        'current_service_last_time_ok': {
-            'description': 'The last time the service was OK (Unix timestamp)',
-        },
-        'current_service_last_time_unknown': {
-            'description': 'The last time the service was UNKNOWN (Unix timestamp)',
-        },
-        'current_service_last_time_warning': {
-            'description': 'The last time the service was in WARNING state (Unix timestamp)',
-        },
-        'current_service_latency': {
-            'description': 'Time difference between scheduled check time and actual check time',
-        },
-        'current_service_long_plugin_output': {
-            'description': 'Unabbreviated output of the last check plugin',
-        },
-        'current_service_low_flap_threshold': {
-            'description': 'Low threshold of flap detection',
-        },
-        'current_service_max_check_attempts': {
-            'description': 'The maximum number of check attempts',
-        },
-        'current_service_modified_attributes': {
-            'description': 'A bitmask specifying which attributes have been modified',
-        },
-        'current_service_modified_attributes_list': {
-            'description': 'A list of all modified attributes',
-        },
-        'current_service_next_check': {
-            'description': 'The scheduled time of the next check (Unix timestamp)',
-        },
-        'current_service_next_notification': {
-            'description': 'The time of the next notification (Unix timestamp)',
-        },
-        'current_service_no_more_notifications': {
-            'description': 'Whether to stop sending notifications (0/1)',
-        },
-        'current_service_notes': {
-            'description': 'Optional notes about the service',
-        },
-        'current_service_notes_expanded': {
-            'description': 'The notes with (the most important) macros expanded',
-        },
-        'current_service_notes_url': {
-            'description': 'An optional URL for additional notes about the service',
-        },
-        'current_service_notes_url_expanded': {
-            'description': 'The notes_url with (the most important) macros expanded',
-        },
-        'current_service_notification_interval': {
-            'description': 'Interval of periodic notification or 0 if its off',
-        },
-        'current_service_notification_period': {
-            'description': 'The name of the notification period of the service. It this is empty, service problems are always notified.',
-        },
-        'current_service_notifications_enabled': {
-            'description': 'Whether notifications are enabled for the service (0/1)',
-        },
-        'current_service_obsess_over_service': {
-            'description': 'Whether \'obsess_over_service\' is enabled for the service (0/1)',
-        },
-        'current_service_percent_state_change': {
-            'description': 'Percent state change',
-        },
-        'current_service_perf_data': {
-            'description': 'Performance data of the last check plugin',
-        },
-        'current_service_plugin_output': {
-            'description': 'Output of the last check plugin',
-        },
-        'current_service_pnpgraph_present': {
-            'description': 'Whether there is a PNP4Nagios graph present for this service (0/1)',
-        },
-        'current_service_process_performance_data': {
-            'description': 'Whether processing of performance data is enabled for the service (0/1)',
-        },
-        'current_service_retry_interval': {
-            'description': 'Number of basic interval lengths between checks when retrying after a soft error',
-        },
-        'current_service_scheduled_downtime_depth': {
-            'description': 'The number of scheduled downtimes the service is currently in',
-        },
-        'current_service_state': {
-            'description': 'The current state of the service (0: OK, 1: WARN, 2: CRITICAL, 3: UNKNOWN)',
-        },
-        'current_service_state_type': {
-            'description': 'The type of the current state (0: soft, 1: hard)',
+            'filters': {
+                'attr': 'service_description'
+            }
         },
         'host_name': {
             'description': 'The name of the host the log entry is about (might be empty)',
@@ -4860,13 +4460,16 @@ livestatus_attribute_map = {
     },
 }
 
-def import_mapping(import_from, import_to):
+def import_mapping(import_from, import_to, prefix=None):
     mapping_from = livestatus_attribute_map[import_from]
     mapping_to = livestatus_attribute_map[import_to]
-    for attr, mapping in mapping_from.items():
-        if attr not in mapping_to:
-            mapping_to[attr] = mapping_from[attr]
-            mapping_to[attr]["foreign"] = True
+    for attr_from, mapping in mapping_from.items():
+        if prefix is None:
+            attr_to = attr_from
+        else:
+            attr_to = "%s%s" % (prefix, attr_from)
+        if attr_to not in mapping_to:
+            mapping_to[attr_to] = mapping_from[attr_from]
 
 
 # Updates Service, Downtime and Comment classe definitions with HostLink
@@ -4883,6 +4486,11 @@ for class_map in ("Hostsbygroup",):
     import_mapping("Host", class_map)
 for class_map in ("Servicesbygroup", "Servicesbyhostgroup"):
     import_mapping("Service", class_map)
+for class_map in ("Logline",):
+    import_mapping("CommandLink", class_map, "current_")
+    import_mapping("ContactLink", class_map, "current_")
+    import_mapping("HostLink", class_map, "current_")
+    import_mapping("ServiceLink", class_map, "current_")
 
 table_class_map = {
     'hosts': livestatus_attribute_map['Host'],

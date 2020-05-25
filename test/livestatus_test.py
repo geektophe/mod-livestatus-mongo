@@ -32,20 +32,17 @@ import time
 import random
 import unittest
 
-from  shinken_test import ShinkenTest
-
-import logging
+from shinken.modulesctx import modulesctx
+from shinken.objects.module import Module
+from shinken_test import ShinkenTest
+from pprint import pprint
 from shinken.log import logger
+import logging
 
 if os.getenv("TEST_DEBUG") == "1" or True:
     logger.setLevel(logging.DEBUG)
 
-from pprint import pprint
-
 sys.setcheckinterval(10000)
-
-from shinken.modulesctx import modulesctx
-from shinken.objects.module import Module
 
 path = ".."
 modulesctx.set_modulesdir(path)
@@ -56,9 +53,7 @@ LiveStatus = livestatus_broker.LiveStatus
 
 class LivestatusTestBase(ShinkenTest):
 
-    def __init__(self, methodName='runTest', cfg_file='etc/shinken_5r_10h_200s.cfg'):
-        super(LivestatusTestBase, self).__init__(methodName)
-        self.cfg_file = cfg_file
+    cfg_file = 'etc/shinken_5r_10h_200s.cfg'
 
     def init_livestatus(self):
         modconf = Module({'module_name': 'LiveStatus2',
