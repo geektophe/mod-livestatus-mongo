@@ -25,7 +25,7 @@
 import time
 
 from livestatus_mongo_query import LiveStatusQuery
-from livestatus_wait_query import LiveStatusWaitQuery
+from livestatus_mongo_wait_query import LiveStatusWaitQuery
 from livestatus_command_query import LiveStatusCommandQuery
 
 class LiveStatusRequest:
@@ -74,23 +74,14 @@ class LiveStatusRequest:
                 query_cmds.append(line)
         if len(external_cmds) > 0:
             for external_cmd in external_cmds:
-                query = LiveStatusCommandQuery(
-                    self.datamgr,
-                    self.return_queue,
-                    self.counters)
+                query = LiveStatusCommandQuery(self.return_queue)
                 query.parse_input(external_cmd)
                 self.queries.append(query)
         if len(wait_cmds) > 1:
-            query = LiveStatusWaitQuery(
-                self.datamgr,
-                self.return_queue,
-                self.counters)
+            query = LiveStatusWaitQuery(self.datamgr)
             query.parse_input('\n'.join(wait_cmds))
             self.queries.append(query)
         if len(query_cmds) > 0:
-            query = LiveStatusQuery(
-                self.datamgr,
-                self.return_queue
-            )
+            query = LiveStatusQuery(self.datamgr)
             query.parse_input('\n'.join(query_cmds))
             self.queries.append(query)

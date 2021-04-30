@@ -41,19 +41,16 @@ class LiveStatusQuery(object):
 
     my_type = 'query'
 
-    def __init__(self, datamgr, return_queue):
+    def __init__(self, datamgr):
         # Runtime data form the global LiveStatus object
         self.datamgr = datamgr
         self.mapping = datamgr.mapping
-        self.return_queue = return_queue
 
         # Private attributes for this specific request
         self.response = LiveStatusResponse()
-        self.authuser = None
         self.table = None
         self.columns = None
         self.limit = None
-        self.extcmd = False
 
         # Initialize the stacks which are needed for the Filter: and Stats:
         # filter- and count-operations
@@ -233,7 +230,6 @@ class LiveStatusQuery(object):
                 except Exception as e:
                     logger.warning("[Livestatus Query] Illegal operation: %s" % e)
                     raise
-                    continue
             elif keyword == 'And':
                 _, andnum = self.split_option(line)
                 # Take the last andnum functions from the stack
@@ -299,12 +295,9 @@ class LiveStatusQuery(object):
                 self.response.separators = Separators(*separators)
             elif keyword == 'Localtime':
                 _, self.client_localtime = self.split_option(line)
-            elif keyword == 'COMMAND':
-                _, self.extcmd = line.split(' ', 1)
             else:
                 # This line is not valid or not implemented
                 logger.error("[Livestatus Query] Received a line of input which i can't handle: '%s'" % line)
-                pass
 
     def process_query(self):
         result = self.launch_query()
@@ -320,7 +313,6 @@ class LiveStatusQuery(object):
         # A minimal integrity check
         if not self.table:
             return []
-
         try:
             # Remember the number of stats filters. We need these numbers as columns later.
             # But we need to ask now, because get_live_data() will empty the stack

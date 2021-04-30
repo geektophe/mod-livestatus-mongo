@@ -31,6 +31,16 @@ class LiveStatusCommandQuery(LiveStatusQuery):
 
     my_type = 'command'
 
+    def __init__(self, return_queue):
+
+        self.return_queue = return_queue
+        self.extcmd = None
+
+        # When was this query launched?
+        self.tic = time.time()
+        # Clients can also send their local time with the request
+        self.client_localtime = self.tic
+
     def parse_input(self, data):
         """Parse the lines of a livestatus request.
 
@@ -51,7 +61,6 @@ class LiveStatusCommandQuery(LiveStatusQuery):
                 # This line is not valid or not implemented
                 logger.warning("[Livestatus Broker Command Query] Received a line of input "
                                "which i can't handle: '%s'" % line)
-                pass
 
     def launch_query(self):
         """ Prepare the request object's filter stacks """

@@ -4219,12 +4219,12 @@ livestatus_attribute_map = {
         },
         'cached_log_messages': {
             'description': 'The current number of log messages MK Livestatus keeps in memory',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  # No message cache
             'datatype': int,
         },
         'cached_log_messages_rate': {
             'description': 'The current number of log messages MK Livestatus keeps in memory',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  # No message cache
             'datatype': float,
         },
         'check_external_commands': {
@@ -4241,12 +4241,12 @@ livestatus_attribute_map = {
         },
         'connections': {
             'description': 'The number of client connections to Livestatus since program start',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  # Service is distributed
             'datatype': int,
         },
         'connections_rate': {
             'description': 'The averaged number of new client connections to Livestatus per second',
-            'function': lambda item: 0,  # REPAIRME
+            'function': lambda item: 0,  # Service is distributed
             'datatype': float,
         },
         'enable_event_handlers': {
@@ -4317,6 +4317,7 @@ livestatus_attribute_map = {
         'last_log_rotation': {
             'description': 'Time time of the last log file rotation',
             'datatype': int,
+            'function': lambda item: 0,  #FIXME Managed externally
         },
         'livestatus_version': {
             'description': 'The version of the MK Livestatus module',

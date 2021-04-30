@@ -94,7 +94,6 @@ OutputFormat: python"""
 
         self.scheduler_loop(5, [[host, 1, 'D']])
         self.update_broker()
-        # 1993O, 3xW, 3xC, 1xU
 
         query = """GET log
 Columns: type host_name state state_type current_host_state current_host_state_type contact_name current_contact_alias
